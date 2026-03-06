@@ -23,14 +23,18 @@ export async function POST(req: NextRequest) {
       .from('transaksi_qris')
       .select('tid, amount, created_date')
 
+    // Normalize date function to handle both "2026/03/01 04:00:17" and "2026-03-01T04:00:17"
+    const normalizeDate = (d: string) => d ? d.replace(/\//g, '-').substring(0, 10) : ''
+
     const existingSet = new Set(
-      existing?.map(q => `${q.tid}-${q.amount}`) || []
+      existing?.map(q => `${normalizeDate(q.created_date)}-${q.tid}-${q.amount}`) || []
     )
 
     const preview = rows.map((row: any, idx: number) => {
       const amount = parseInt(row.AMOUNT || row.amount || 0)
       const tid = row.TID || row.tid || ''
-      const isDuplicate = existingSet.has(`${tid}-${amount}`)
+      const rowDate = row.CREATED_DATE || row.created_date || ''
+      const isDuplicate = existingSet.has(`${normalizeDate(rowDate)}-${tid}-${amount}`)
       const merchant_name = row.MERCHANT_NAME || row.merchant_name || ''
       const isAutoWait = isAutoSkipMybb(merchant_name)
 
