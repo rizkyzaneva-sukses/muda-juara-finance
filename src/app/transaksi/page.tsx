@@ -15,7 +15,36 @@ export default function TransaksiPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ keterangan: '', jumlah: 0 })
 
-  useEffect(() => { fetchData() }, [page, filters])
+  // Bulk Assign States & Master Data
+  const [kementerian, setKementerian] = useState<any[]>([])
+  const [programEvent, setProgramEvent] = useState<any[]>([])
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [bulkKem, setBulkKem] = useState<string>('')
+  const [bulkProgram, setBulkProgram] = useState<string>('')
+  const [bulkSumber, setBulkSumber] = useState<string>('')
+  const [bulkSaving, setBulkSaving] = useState(false)
+
+  useEffect(() => {
+    fetchData()
+    setSelectedIds([])
+  }, [page, filters])
+
+  useEffect(() => {
+    loadMasterData()
+  }, [])
+
+  const loadMasterData = async () => {
+    try {
+      const [k, pe] = await Promise.all([
+        fetch('/api/master?entity=kementerian').then(r => r.json()),
+        fetch('/api/master?entity=program-event').then(r => r.json()),
+      ])
+      setKementerian(k.data || [])
+      setProgramEvent(pe.data || [])
+    } catch (e) {
+      console.error("Gagal memuat master data")
+    }
+  }
 
   const fetchData = async () => {
     setLoading(true)
@@ -62,6 +91,58 @@ export default function TransaksiPage() {
     } catch (e) {
       alert("Gagal merubah data")
     }
+  }
+
+  const toggleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedIds(data.map(t => t.id))
+    } else {
+      setSelectedIds([])
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    )
+  }
+
+  const applyBulkEdit = async () => {
+    if (selectedIds.length === 0) return
+    if (!bulkKem && !bulkProgram && !bulkSumber) {
+      alert("Pilih setidaknya satu data yang ingin diubah")
+      return
+    }
+
+    setBulkSaving(true)
+    const token = localStorage.getItem('admin_token')
+
+    const updates: any = {}
+    if (bulkKem) updates.kementerian_id = bulkKem
+    if (bulkProgram) updates.program_event_id = bulkProgram
+    if (bulkSumber) updates.sumber = bulkSumber
+
+    try {
+      const res = await fetch('/api/transaksi', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ ids: selectedIds, updates })
+      })
+
+      if (!res.ok) throw new Error("Gagal menyimpan data")
+
+      setSelectedIds([])
+      setBulkKem('')
+      setBulkProgram('')
+      setBulkSumber('')
+      fetchData() // reload data
+    } catch (e: any) {
+      alert(e.message || "Gagal menyimpan data masal")
+    }
+    setBulkSaving(false)
   }
 
   return (
@@ -116,10 +197,47 @@ export default function TransaksiPage() {
 
         {/* Table */}
         <div className="card overflow-hidden">
+          {selectedIds.length > 0 && (
+            <div className="px-5 py-3 border-b flex flex-wrap gap-4 items-center justify-between" style={{ background: 'rgba(59,130,246,0.05)', borderColor: 'var(--bg-border)' }}>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                  {selectedIds.length} dipilih
+                </span>
+                <span className="text-xs text-secondary ml-2">Terapkan aksi masal:</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <select className="input-dark text-xs py-1" style={{ width: 140 }} value={bulkKem} onChange={e => setBulkKem(e.target.value)}>
+                  <option value="">— Kementerian —</option>
+                  {kementerian.map((k: any) => <option key={k.id} value={k.id}>{k.nama}</option>)}
+                </select>
+                <select className="input-dark text-xs py-1" style={{ width: 140 }} value={bulkProgram} onChange={e => setBulkProgram(e.target.value)}>
+                  <option value="">— Program Event —</option>
+                  {programEvent.map((p: any) => <option key={p.id} value={p.id}>{p.nama}</option>)}
+                </select>
+                <select className="input-dark text-xs py-1" style={{ width: 140 }} value={bulkSumber} onChange={e => setBulkSumber(e.target.value)}>
+                  <option value="">— Sumber —</option>
+                  <option value="BCA">BCA Syariah</option>
+                  <option value="BSI">BSI</option>
+                  <option value="manual">Manual</option>
+                </select>
+                <button onClick={applyBulkEdit} disabled={bulkSaving} className="btn-primary py-1 px-4 text-xs font-medium h-[28px]">
+                  {bulkSaving ? 'Menyimpan...' : 'Terapkan'}
+                </button>
+              </div>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--bg-border)', background: 'rgba(255,255,255,0.02)' }}>
+                  <th className="px-5 py-3 w-[40px] text-center border-r" style={{ borderColor: 'var(--bg-border)' }}>
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500/50"
+                      checked={data.length > 0 && selectedIds.length === data.length}
+                      onChange={toggleSelectAll}
+                    />
+                  </th>
                   <th className="text-left px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Tanggal</th>
                   <th className="text-left px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Keterangan</th>
                   <th className="text-right px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Jumlah</th>
@@ -132,9 +250,19 @@ export default function TransaksiPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={7} className="text-center py-12"><div className="spinner mx-auto" /></td></tr>
+                  <tr><td colSpan={9} className="text-center py-12"><div className="spinner mx-auto" /></td></tr>
+                ) : data.length === 0 ? (
+                  <tr><td colSpan={9} className="text-center py-12 text-sm" style={{ color: 'var(--text-secondary)' }}>Tidak ada data</td></tr>
                 ) : data.map(t => (
                   <tr key={t.id} className="table-row-hover" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                    <td className="px-5 py-3 text-center border-r" style={{ borderColor: 'var(--bg-border)' }}>
+                      <input
+                        type="checkbox"
+                        className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500/50"
+                        checked={selectedIds.includes(t.id)}
+                        onChange={() => toggleSelect(t.id)}
+                      />
+                    </td>
                     {editingId === t.id ? (
                       <td colSpan={8} className="px-5 py-3">
                         <div className="flex items-center gap-3">

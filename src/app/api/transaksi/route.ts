@@ -73,7 +73,25 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
-    const { id, ...updates } = await req.json()
+    const body = await req.json()
+
+    // Check if it's a bulk update
+    if (body.ids && Array.isArray(body.ids) && body.updates) {
+      const { ids, updates } = body
+      if (updates.kementerian_id || updates.jenis_transaksi_id || updates.kategori_pengeluaran_id) {
+        updates.status = updates.kementerian_id ? 'koreksi' : 'lainnya'
+      }
+      const { data, error } = await supabaseAdmin
+        .from('transaksi')
+        .update(updates)
+        .in('id', ids)
+        .select()
+      if (error) throw error
+      return NextResponse.json({ data })
+    }
+
+    // Single update
+    const { id, ...updates } = body
 
     // Determine status after update
     if (updates.kementerian_id || updates.jenis_transaksi_id || updates.kategori_pengeluaran_id) {
