@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
         const dateFrom = searchParams.get('date_from')
         const dateTo = searchParams.get('date_to')
         const kemId = searchParams.get('kementerian_id')
+        const programId = searchParams.get('program_event_id')
         const sumber = searchParams.get('sumber')
 
         // Build filter for transaksi
@@ -26,6 +27,7 @@ export async function GET(req: NextRequest) {
         if (dateFrom) query = query.gte('tanggal', dateFrom)
         if (dateTo) query = query.lte('tanggal', dateTo)
         if (kemId) query = query.eq('kementerian_id', kemId)
+        if (programId) query = query.eq('program_event_id', programId)
         if (sumber) query = query.eq('sumber', sumber)
 
         const { data: transaksi, error } = await query
@@ -55,6 +57,32 @@ export async function GET(req: NextRequest) {
             } else {
                 byKem[kemKey].total_keluar += actualJumlah
                 byKem[kemKey].count_keluar++
+            }
+        })
+
+        // Summary by Program Event
+        const byProgram: Record<string, any> = {}
+        transaksi?.forEach(t => {
+            const progKey = t.program_event_id?.toString() || 'tanpa'
+            if (!byProgram[progKey]) {
+                byProgram[progKey] = {
+                    program_id: t.program_event_id,
+                    program_nama: t.program_event?.nama || 'Tanpa Program/Event',
+                    total_masuk: 0,
+                    total_keluar: 0,
+                    count_masuk: 0,
+                    count_keluar: 0,
+                }
+            }
+
+            const actualJumlah = t.sumber === 'QRIS' ? t.jumlah * (1 - MDR_RATE) : t.jumlah
+
+            if (t.tipe === 'masuk') {
+                byProgram[progKey].total_masuk += actualJumlah
+                byProgram[progKey].count_masuk++
+            } else {
+                byProgram[progKey].total_keluar += actualJumlah
+                byProgram[progKey].count_keluar++
             }
         })
 
@@ -91,6 +119,7 @@ export async function GET(req: NextRequest) {
                 total_transaksi: transaksi?.length || 0,
             },
             by_kementerian: Object.values(byKem).sort((a: any, b: any) => b.total_masuk - a.total_masuk),
+            by_program: Object.values(byProgram).sort((a: any, b: any) => b.total_masuk - a.total_masuk),
             by_month: Object.values(byMonth).sort((a: any, b: any) => a.month.localeCompare(b.month)),
         })
     } catch (error: any) {

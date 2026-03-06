@@ -11,23 +11,28 @@ export default function LaporanPage() {
     date_from: '',
     date_to: '',
     kementerian_id: '',
+    program_event_id: '',
     sumber: ''
   })
   const [kementerianOptions, setKementerianOptions] = useState<any[]>([])
+  const [programOptions, setProgramOptions] = useState<any[]>([])
 
   useEffect(() => {
     fetchData()
   }, [filters])
 
   useEffect(() => {
-    fetchKementerian()
+    fetchMasterData()
   }, [])
 
-  const fetchKementerian = async () => {
+  const fetchMasterData = async () => {
     try {
-      const res = await fetch('/api/master/kementerian')
-      const d = await res.json()
-      setKementerianOptions(d.data || [])
+      const [kemRes, progRes] = await Promise.all([
+        fetch('/api/master?entity=kementerian').then(r => r.json()),
+        fetch('/api/master?entity=program-event').then(r => r.json())
+      ])
+      setKementerianOptions(kemRes.data || [])
+      setProgramOptions(progRes.data || [])
     } catch (e) {
       console.error(e)
     }
@@ -92,6 +97,17 @@ export default function LaporanPage() {
             ))}
           </select>
           <select
+            value={filters.program_event_id}
+            onChange={e => setFilters(f => ({ ...f, program_event_id: e.target.value }))}
+            className="input-dark text-xs"
+            style={{ width: 180 }}
+          >
+            <option value="">Semua Kegiatan / Event</option>
+            {programOptions.map(p => (
+              <option key={p.id} value={p.id}>{p.nama}</option>
+            ))}
+          </select>
+          <select
             value={filters.sumber}
             onChange={e => setFilters(f => ({ ...f, sumber: e.target.value }))}
             className="input-dark text-xs"
@@ -105,7 +121,7 @@ export default function LaporanPage() {
 
           {Object.values(filters).some(v => v) && (
             <button
-              onClick={() => setFilters({ date_from: '', date_to: '', kementerian_id: '', sumber: '' })}
+              onClick={() => setFilters({ date_from: '', date_to: '', kementerian_id: '', program_event_id: '', sumber: '' })}
               className="text-xs px-3 py-1.5 rounded ml-auto flex items-center gap-1"
               style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)' }}
             >
@@ -203,6 +219,46 @@ export default function LaporanPage() {
                           </td>
                           <td className="px-5 py-3 text-right text-xs font-mono text-red-500">
                             -{formatRupiah(k.total_keluar)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Laporan Per Kegiatan / Event */}
+              <div className="card overflow-hidden">
+                <div className="p-4 border-b flex justify-between items-center" style={{ borderColor: 'var(--bg-border)' }}>
+                  <h2 className="font-semibold text-sm flex items-center gap-2">
+                    <Briefcase size={16} style={{ color: 'var(--accent-gold)' }} /> By Kegiatan / Event
+                  </h2>
+                </div>
+                <div className="overflow-x-auto max-h-[400px]">
+                  <table className="w-full text-sm relative">
+                    <thead className="sticky top-0 z-10" style={{ background: 'var(--bg-secondary)' }}>
+                      <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
+                        <th className="text-left px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Kegiatan</th>
+                        <th className="text-right px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Pemasukan</th>
+                        <th className="text-right px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Pengeluaran</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data?.by_program?.length === 0 ? (
+                        <tr><td colSpan={3} className="text-center py-8 text-xs" style={{ color: 'var(--text-secondary)' }}>Tidak ada data</td></tr>
+                      ) : data?.by_program?.map((p: any, i: number) => (
+                        <tr key={i} className="table-row-hover" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                          <td className="px-5 py-3 text-xs max-w-[200px] truncate">
+                            <span>{p.program_nama}</span>
+                            <div className="text-[10px] mt-1 opacity-70">
+                              {p.count_masuk + p.count_keluar} transaksi
+                            </div>
+                          </td>
+                          <td className="px-5 py-3 text-right text-xs font-mono text-green-500">
+                            +{formatRupiah(p.total_masuk)}
+                          </td>
+                          <td className="px-5 py-3 text-right text-xs font-mono text-red-500">
+                            -{formatRupiah(p.total_keluar)}
                           </td>
                         </tr>
                       ))}
