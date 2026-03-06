@@ -6,14 +6,25 @@ import { RefreshCw, CheckCircle, AlertCircle, TrendingDown } from 'lucide-react'
 
 export default function RekonsiliasiPage() {
   const [qrisData, setQrisData] = useState<any[]>([])
+  const [overallStats, setOverallStats] = useState<any[]>([])
+  const [totalData, setTotalData] = useState(0)
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
   const [results, setResults] = useState<any>(null)
   const [logs, setLogs] = useState<any[]>([])
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
+  const [page, setPage] = useState(1)
+  const [statusFilter, setStatusFilter] = useState('')
+  const [sortBy, setSortBy] = useState('created_date')
+  const [sortOrder, setSortOrder] = useState('desc')
+  const limit = 50
+
   useEffect(() => {
     loadQris()
+  }, [page, statusFilter, sortBy, sortOrder])
+
+  useEffect(() => {
     loadLogs()
   }, [])
 
@@ -24,9 +35,19 @@ export default function RekonsiliasiPage() {
 
   const loadQris = async () => {
     setLoading(true)
-    const res = await fetch('/api/qris?limit=100')
+    const params = new URLSearchParams()
+    params.append('limit', limit.toString())
+    params.append('page', page.toString())
+    if (statusFilter) params.append('status', statusFilter)
+    if (sortBy) {
+      params.append('sort_by', sortBy)
+      params.append('sort_order', sortOrder)
+    }
+    const res = await fetch(`/api/qris?${params.toString()}`)
     const d = await res.json()
     setQrisData(d.data || [])
+    setTotalData(d.count || 0)
+    if (d.stats) setOverallStats(d.stats)
     setLoading(false)
   }
 
@@ -57,13 +78,13 @@ export default function RekonsiliasiPage() {
   }
 
   const statusCount = {
-    pending: qrisData.filter(q => q.status === 'pending').length,
-    matched: qrisData.filter(q => q.status === 'matched').length,
-    cek_manual: qrisData.filter(q => q.status === 'cek_manual').length,
+    pending: overallStats.filter(q => q.status === 'pending').length,
+    matched: overallStats.filter(q => q.status === 'matched').length,
+    cek_manual: overallStats.filter(q => q.status === 'cek_manual').length,
   }
 
-  const totalQris = qrisData.reduce((s, q) => s + q.amount, 0)
-  const totalMatched = qrisData.filter(q => q.status === 'matched').reduce((s, q) => s + q.amount, 0)
+  const totalQris = overallStats.reduce((s, q) => s + q.amount, 0)
+  const totalMatched = overallStats.filter(q => q.status === 'matched').reduce((s, q) => s + q.amount, 0)
 
   return (
     <AppLayout>
@@ -158,19 +179,45 @@ export default function RekonsiliasiPage() {
 
         {/* QRIS table */}
         <div className="card overflow-hidden">
-          <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--bg-border)' }}>
+          <div className="px-5 py-4 border-b flex flex-wrap gap-4 items-center justify-between" style={{ borderColor: 'var(--bg-border)' }}>
             <h2 className="font-semibold text-sm">Data QRIS</h2>
+            <div className="flex items-center gap-3">
+              <select
+                value={statusFilter}
+                onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
+                className="input-dark text-xs py-1.5"
+                style={{ width: 140 }}
+              >
+                <option value="">Semua Status</option>
+                <option value="pending">Pending</option>
+                <option value="matched">Matched</option>
+                <option value="cek_manual">Cek Manual</option>
+                <option value="valid">Valid</option>
+              </select>
+            </div>
           </div>
           <div className="overflow-x-auto max-h-96 overflow-y-auto">
             <table className="w-full text-xs">
               <thead className="sticky top-0" style={{ background: 'var(--bg-card)' }}>
                 <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
-                  <th className="text-left px-4 py-2 uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Tanggal</th>
-                  <th className="text-left px-4 py-2 uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Merchant</th>
-                  <th className="text-right px-4 py-2 uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Jumlah</th>
-                  <th className="text-left px-4 py-2 uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Kementerian</th>
-                  <th className="text-left px-4 py-2 uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Jenis</th>
-                  <th className="text-left px-4 py-2 uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Status</th>
+                  <th className="text-left px-4 py-2 uppercase font-medium cursor-pointer hover:text-white transition-colors" style={{ color: sortBy === 'created_date' ? 'var(--accent-gold)' : 'var(--text-secondary)' }} onClick={() => { setSortBy('created_date'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') }}>
+                    Tanggal {sortBy === 'created_date' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th className="text-left px-4 py-2 uppercase font-medium cursor-pointer hover:text-white transition-colors" style={{ color: sortBy === 'merchant_name' ? 'var(--accent-gold)' : 'var(--text-secondary)' }} onClick={() => { setSortBy('merchant_name'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') }}>
+                    Merchant {sortBy === 'merchant_name' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th className="text-right px-4 py-2 uppercase font-medium cursor-pointer hover:text-white transition-colors" style={{ color: sortBy === 'amount' ? 'var(--accent-gold)' : 'var(--text-secondary)' }} onClick={() => { setSortBy('amount'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') }}>
+                    Jumlah {sortBy === 'amount' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th className="text-left px-4 py-2 uppercase font-medium cursor-pointer hover:text-white transition-colors" style={{ color: sortBy === 'kementerian_id' ? 'var(--accent-gold)' : 'var(--text-secondary)' }} onClick={() => { setSortBy('kementerian_id'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') }}>
+                    Kementerian {sortBy === 'kementerian_id' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th className="text-left px-4 py-2 uppercase font-medium cursor-pointer hover:text-white transition-colors" style={{ color: sortBy === 'jenis_transaksi_id' ? 'var(--accent-gold)' : 'var(--text-secondary)' }} onClick={() => { setSortBy('jenis_transaksi_id'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') }}>
+                    Jenis {sortBy === 'jenis_transaksi_id' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th className="text-left px-4 py-2 uppercase font-medium cursor-pointer hover:text-white transition-colors" style={{ color: sortBy === 'status' ? 'var(--accent-gold)' : 'var(--text-secondary)' }} onClick={() => { setSortBy('status'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') }}>
+                    Status {sortBy === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -190,10 +237,9 @@ export default function RekonsiliasiPage() {
                       {q.jenis_transaksi?.nama || '—'}
                     </td>
                     <td className="px-4 py-2.5">
-                      <span className={`px-2 py-0.5 rounded text-xs ${
-                        q.status === 'matched' ? 'badge-valid' :
+                      <span className={`px-2 py-0.5 rounded text-xs ${q.status === 'matched' ? 'badge-valid' :
                         q.status === 'cek_manual' ? 'badge-cek-manual' : 'badge-lainnya'
-                      }`}>
+                        }`}>
                         {q.status}
                       </span>
                     </td>
@@ -201,6 +247,29 @@ export default function RekonsiliasiPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+          <div className="px-5 py-3 border-t flex items-center justify-between" style={{ borderColor: 'var(--bg-border)' }}>
+            <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+              Menampilkan {qrisData.length} dari {totalData} data
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 rounded text-xs disabled:opacity-50"
+                style={{ background: 'rgba(255,255,255,0.05)' }}
+              >
+                Sebelumnya
+              </button>
+              <button
+                onClick={() => setPage(p => p + 1)}
+                disabled={page * limit >= totalData}
+                className="px-3 py-1.5 rounded text-xs disabled:opacity-50"
+                style={{ background: 'rgba(255,255,255,0.05)' }}
+              >
+                Selanjutnya
+              </button>
+            </div>
           </div>
         </div>
 

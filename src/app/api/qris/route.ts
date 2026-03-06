@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isAdminRequest } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function POST(req: NextRequest) {
   if (!isAdminRequest(req)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -41,6 +44,8 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const status = searchParams.get('status')
     const kemId = searchParams.get('kementerian_id')
+    const sortBy = searchParams.get('sort_by') || 'created_date'
+    const sortOrder = searchParams.get('sort_order') === 'asc'
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
 
@@ -52,16 +57,21 @@ export async function GET(req: NextRequest) {
         jenis_transaksi:jenis_transaksi_id(id, kode, nama),
         program_event:program_event_id(id, nama)
       `, { count: 'exact' })
-      .order('created_date', { ascending: false })
+      .order(sortBy, { ascending: sortOrder })
       .range((page - 1) * limit, page * limit - 1)
 
     if (status) query = query.eq('status', status)
     if (kemId) query = query.eq('kementerian_id', kemId)
 
-    const { data, error, count } = await query
+    const [queryRes, statsRes] = await Promise.all([
+      query,
+      supabaseAdmin.from('transaksi_qris').select('status, amount')
+    ])
+
+    const { data, error, count } = queryRes
     if (error) throw error
 
-    return NextResponse.json({ data, count })
+    return NextResponse.json({ data, count, stats: statsRes.data })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
