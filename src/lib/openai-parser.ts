@@ -1,9 +1,16 @@
 import OpenAI from 'openai'
 import pdfParse from 'pdf-parse'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+let openaiInstance: OpenAI | null = null;
+const getOpenAI = () => {
+  if (!openaiInstance) {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY tidak ditemukan di environment. Konfigurasi dulu di EasyPanel dan Redeploy.')
+    }
+    openaiInstance = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  }
+  return openaiInstance
+}
 
 export interface ParsedTransaction {
   tanggal: string
@@ -13,17 +20,16 @@ export interface ParsedTransaction {
   saldo: number
 }
 
-export async function parseBankStatementPDF(base64PDF: string): Promise<ParsedTransaction[]> {
-  // Convert base64 to buffer and extract text locally first
-  const buffer = Buffer.from(base64PDF, 'base64')
+export async function parseBankStatementPDF(buffer: Buffer): Promise<ParsedTransaction[]> {
   let rawText = ''
   try {
     const data = await pdfParse(buffer)
     rawText = data.text
   } catch (err) {
-    throw new Error('Gagal membaca text dari PDF')
+    throw new Error('Gagal membaca text dari PDF: Format rusak atau dienkripsi.')
   }
 
+  const openai = getOpenAI()
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',
     max_tokens: 4000,
@@ -66,6 +72,7 @@ Contoh output:
 }
 
 export async function parseBankStatementImage(base64Image: string, mimeType: string): Promise<ParsedTransaction[]> {
+  const openai = getOpenAI()
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',
     max_tokens: 4000,

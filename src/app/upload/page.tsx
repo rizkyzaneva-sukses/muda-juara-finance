@@ -83,7 +83,7 @@ export default function UploadPage() {
   }
 
   // Add an image compressor to avoid limits
-  const compressImage = (file: File): Promise<string> => {
+  const compressImage = (file: File): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = e => {
@@ -103,8 +103,14 @@ export default function UploadPage() {
           canvas.height = height
           const ctx = canvas.getContext('2d')
           ctx?.drawImage(img, 0, 0, width, height)
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8)
-          resolve(compressedDataUrl.split(',')[1]) // Return base64 without prefix
+          canvas.toBlob(
+            blob => {
+              if (blob) resolve(blob)
+              else reject(new Error('Canvas to Blob failed'))
+            },
+            'image/jpeg',
+            0.8
+          )
         }
         img.onerror = reject
         img.src = e.target?.result as string
@@ -119,28 +125,23 @@ export default function UploadPage() {
     await loadMasterData()
     setLoading(true)
     try {
-      let base64 = ''
-      let mimeType = mode === 'mutasi-pdf' ? 'application/pdf' : 'image/jpeg'
+      const mimeType = mode === 'mutasi-pdf' ? 'application/pdf' : 'image/jpeg'
+      const formData = new FormData()
 
       if (mode === 'mutasi-image') {
-        base64 = await compressImage(file)
+        const compressedBlob = await compressImage(file)
+        formData.append('file', compressedBlob, file.name)
       } else {
-        // For PDF, we just use standard base64 parser
-        base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = () => {
-            resolve((reader.result as string).split(',')[1])
-          }
-          reader.onerror = reject
-          reader.readAsDataURL(file)
-        })
+        formData.append('file', file)
       }
+      formData.append('mimeType', mimeType)
+      formData.append('bank', bank)
 
       const token = localStorage.getItem('admin_token')
       const res = await fetch('/api/mutasi/parse', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ fileBase64: base64, mimeType, bank }),
+        headers: { Authorization: `Bearer ${token}` }, // NO Content-Type so browser sets boundary
+        body: formData,
       })
       const text = await res.text()
       try {

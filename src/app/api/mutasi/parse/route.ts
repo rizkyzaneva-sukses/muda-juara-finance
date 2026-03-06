@@ -10,14 +10,23 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { fileBase64, mimeType, bank } = await req.json()
+    const formData = await req.formData()
+    const file = formData.get('file') as Blob
+    const mimeType = formData.get('mimeType') as string
+    const bank = formData.get('bank') as string
+
+    if (!file) throw new Error('File tidak ditemukan')
 
     let parsed: any[] = []
+    const arrayBuffer = await file.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
 
     if (mimeType === 'application/pdf') {
-      parsed = await parseBankStatementPDF(fileBase64)
+      parsed = await parseBankStatementPDF(buffer)
     } else if (mimeType.startsWith('image/')) {
-      parsed = await parseBankStatementImage(fileBase64, mimeType)
+      // images are still passed to vision as base64 string
+      const base64 = buffer.toString('base64')
+      parsed = await parseBankStatementImage(base64, mimeType)
     } else {
       return NextResponse.json({ error: 'Format file tidak didukung' }, { status: 400 })
     }
