@@ -154,6 +154,31 @@ export default function TransaksiPage() {
     setBulkSaving(false)
   }
 
+  const deleteSelected = async () => {
+    if (selectedIds.length === 0) return
+    if (!confirm(`Apakah Anda yakin ingin menghapus ${selectedIds.length} data terpilih?`)) return
+
+    setBulkSaving(true)
+    const token = localStorage.getItem('admin_token')
+    try {
+      const res = await fetch('/api/transaksi', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ ids: selectedIds })
+      })
+      if (!res.ok) throw new Error("Gagal menghapus data")
+
+      setSelectedIds([])
+      fetchData()
+    } catch (e: any) {
+      alert(e.message || "Gagal menghapus data masal")
+    }
+    setBulkSaving(false)
+  }
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -194,8 +219,11 @@ export default function TransaksiPage() {
             <option value="BSI">BSI</option>
             <option value="manual">Manual</option>
           </select>
-          <input type="date" value={filters.date_from} onChange={e => { setFilters(f => ({ ...f, date_from: e.target.value })); setPage(1) }} className="input-dark text-xs" />
-          <input type="date" value={filters.date_to} onChange={e => { setFilters(f => ({ ...f, date_to: e.target.value })); setPage(1) }} className="input-dark text-xs" />
+          <div className="flex items-center gap-2">
+            <input type="date" value={filters.date_from} onChange={e => { setFilters(f => ({ ...f, date_from: e.target.value })); setPage(1) }} className="input-dark text-xs" />
+            <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>s/d</span>
+            <input type="date" value={filters.date_to} onChange={e => { setFilters(f => ({ ...f, date_to: e.target.value })); setPage(1) }} className="input-dark text-xs" />
+          </div>
           {Object.values(filters).some(v => v) && (
             <button onClick={() => { setFilters({ status: '', tipe: '', sumber: '', search: '', date_from: '', date_to: '' }); setPage(1) }}
               className="text-xs px-3 py-1.5 rounded" style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)' }}>
@@ -244,6 +272,9 @@ export default function TransaksiPage() {
                 </select>
                 <button onClick={applyBulkEdit} disabled={bulkSaving} className="btn-primary py-1 px-4 text-xs font-medium h-[28px]">
                   {bulkSaving ? 'Menyimpan...' : 'Terapkan'}
+                </button>
+                <button onClick={deleteSelected} disabled={bulkSaving} className="py-1 px-4 text-xs font-medium h-[28px] bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded border border-red-500/20 transition-colors">
+                  Hapus
                 </button>
               </div>
             </div>

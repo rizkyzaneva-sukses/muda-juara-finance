@@ -48,6 +48,8 @@ export async function GET(req: NextRequest) {
     const sortOrder = searchParams.get('sort_order') === 'asc'
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
+    const dateFrom = searchParams.get('date_from')
+    const dateTo = searchParams.get('date_to')
 
     let query = supabaseAdmin
       .from('transaksi_qris')
@@ -62,6 +64,8 @@ export async function GET(req: NextRequest) {
 
     if (status) query = query.eq('status', status)
     if (kemId) query = query.eq('kementerian_id', kemId)
+    if (dateFrom) query = query.gte('created_date', dateFrom)
+    if (dateTo) query = query.lte('created_date', dateTo)
 
     const [queryRes, statsRes] = await Promise.all([
       query,
@@ -97,6 +101,28 @@ export async function PATCH(req: NextRequest) {
     if (error) throw error
 
     return NextResponse.json({ updated: data?.length, data })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  if (!isAdminRequest(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const body = await req.json()
+    if (body.ids && Array.isArray(body.ids)) {
+      const { error } = await supabaseAdmin.from('transaksi_qris').delete().in('id', body.ids)
+      if (error) throw error
+      return NextResponse.json({ success: true, deleted: body.ids.length })
+    } else if (body.id) {
+      const { error } = await supabaseAdmin.from('transaksi_qris').delete().eq('id', body.id)
+      if (error) throw error
+      return NextResponse.json({ success: true })
+    }
+    return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

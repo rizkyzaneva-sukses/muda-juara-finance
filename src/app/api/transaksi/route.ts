@@ -118,11 +118,19 @@ export async function DELETE(req: NextRequest) {
   }
 
   try {
-    const { id } = await req.json()
-    const { error } = await supabaseAdmin.from('transaksi').delete().eq('id', id)
-    if (error) throw error
-    return NextResponse.json({ success: true })
+    const body = await req.json()
+    if (body.ids && Array.isArray(body.ids)) {
+      const { error } = await supabaseAdmin.from('transaksi').delete().in('id', body.ids)
+      if (error) throw error
+      return NextResponse.json({ success: true, deleted: body.ids.length })
+    } else if (body.id) {
+      const { error } = await supabaseAdmin.from('transaksi').delete().eq('id', body.id)
+      if (error) throw error
+      return NextResponse.json({ success: true })
+    }
+    return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
+

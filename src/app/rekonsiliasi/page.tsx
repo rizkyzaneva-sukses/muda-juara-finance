@@ -30,12 +30,14 @@ export default function RekonsiliasiPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [sortBy, setSortBy] = useState('created_date')
   const [sortOrder, setSortOrder] = useState('desc')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const limit = 50
 
   useEffect(() => {
     loadQris()
     setSelectedIds([]) // Reset selection on page or filter change
-  }, [page, statusFilter, sortBy, sortOrder])
+  }, [page, statusFilter, sortBy, sortOrder, dateFrom, dateTo])
 
   useEffect(() => {
     loadLogs()
@@ -72,6 +74,9 @@ export default function RekonsiliasiPage() {
       params.append('sort_by', sortBy)
       params.append('sort_order', sortOrder)
     }
+    if (dateFrom) params.append('date_from', dateFrom)
+    if (dateTo) params.append('date_to', dateTo)
+
     const res = await fetch(`/api/qris?${params.toString()}`)
     const d = await res.json()
     setQrisData(d.data || [])
@@ -153,6 +158,32 @@ export default function RekonsiliasiPage() {
       setBulkJenis('')
       setBulkProgram('')
       loadQris() // reload data
+    } catch (e: any) {
+      showToast(e.message, 'error')
+    }
+    setBulkSaving(false)
+  }
+
+  const deleteSelected = async () => {
+    if (selectedIds.length === 0) return
+    if (!confirm(`Apakah Anda yakin ingin menghapus ${selectedIds.length} data terpilih?`)) return
+
+    setBulkSaving(true)
+    const token = localStorage.getItem('admin_token')
+    try {
+      const res = await fetch('/api/qris', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ ids: selectedIds })
+      })
+      if (!res.ok) throw new Error("Gagal menghapus data")
+
+      showToast(`Berhasil menghapus ${selectedIds.length} data`)
+      setSelectedIds([])
+      loadQris()
     } catch (e: any) {
       showToast(e.message, 'error')
     }
@@ -264,6 +295,11 @@ export default function RekonsiliasiPage() {
           <div className="px-5 py-4 border-b flex flex-wrap gap-4 items-center justify-between" style={{ borderColor: 'var(--bg-border)' }}>
             <h2 className="font-semibold text-sm">Data QRIS</h2>
             <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }} className="input-dark text-xs py-1.5" />
+                <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>s/d</span>
+                <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }} className="input-dark text-xs py-1.5" />
+              </div>
               <select
                 value={statusFilter}
                 onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
@@ -302,6 +338,9 @@ export default function RekonsiliasiPage() {
                 </select>
                 <button onClick={applyBulkEdit} disabled={bulkSaving} className="btn-primary py-1 px-4 text-xs font-medium h-[28px]">
                   {bulkSaving ? 'Menyimpan...' : 'Terapkan'}
+                </button>
+                <button onClick={deleteSelected} disabled={bulkSaving} className="py-1 px-4 text-xs font-medium h-[28px] bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded border border-red-500/20 transition-colors">
+                  Hapus
                 </button>
               </div>
             </div>
