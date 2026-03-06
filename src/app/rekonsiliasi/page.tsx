@@ -14,6 +14,18 @@ export default function RekonsiliasiPage() {
   const [logs, setLogs] = useState<any[]>([])
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
+  // Master Data States
+  const [kementerian, setKementerian] = useState<any[]>([])
+  const [jenisTransaksi, setJenisTransaksi] = useState<any[]>([])
+  const [programEvent, setProgramEvent] = useState<any[]>([])
+
+  // Bulk Assign States
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [bulkKem, setBulkKem] = useState<string>('')
+  const [bulkJenis, setBulkJenis] = useState<string>('')
+  const [bulkProgram, setBulkProgram] = useState<string>('')
+  const [bulkSaving, setBulkSaving] = useState(false)
+
   const [page, setPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState('')
   const [sortBy, setSortBy] = useState('created_date')
@@ -22,11 +34,28 @@ export default function RekonsiliasiPage() {
 
   useEffect(() => {
     loadQris()
+    setSelectedIds([]) // Reset selection on page or filter change
   }, [page, statusFilter, sortBy, sortOrder])
 
   useEffect(() => {
     loadLogs()
+    loadMasterData()
   }, [])
+
+  const loadMasterData = async () => {
+    try {
+      const [k, j, pe] = await Promise.all([
+        fetch('/api/master?entity=kementerian').then(r => r.json()),
+        fetch('/api/master?entity=jenis-transaksi').then(r => r.json()),
+        fetch('/api/master?entity=program-event').then(r => r.json()),
+      ])
+      setKementerian(k.data || [])
+      setJenisTransaksi(j.data || [])
+      setProgramEvent(pe.data || [])
+    } catch (e) {
+      console.error("Gagal memuat master data")
+    }
+  }
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -75,6 +104,59 @@ export default function RekonsiliasiPage() {
       showToast(e.message, 'error')
     }
     setRunning(false)
+  }
+
+  const toggleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedIds(qrisData.map(q => q.id))
+    } else {
+      setSelectedIds([])
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    )
+  }
+
+  const applyBulkEdit = async () => {
+    if (selectedIds.length === 0) return
+    if (!bulkKem && !bulkJenis && !bulkProgram) {
+      showToast("Pilih setidaknya satu data yang ingin diubah", "error")
+      return
+    }
+
+    setBulkSaving(true)
+    const token = localStorage.getItem('admin_token')
+
+    const updates: any = {}
+    if (bulkKem) updates.kementerian_id = bulkKem
+    if (bulkJenis) updates.jenis_transaksi_id = bulkJenis
+    if (bulkProgram) updates.program_event_id = bulkProgram
+
+    try {
+      const res = await fetch('/api/qris', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ ids: selectedIds, updates })
+      })
+
+      if (!res.ok) throw new Error("Gagal menyimpan data")
+
+      showToast(`Berhasil mengubah ${selectedIds.length} data`)
+      setSelectedIds([])
+      setBulkKem('')
+      setBulkJenis('')
+      setBulkProgram('')
+      loadQris() // reload data
+    } catch (e: any) {
+      showToast(e.message, 'error')
+    }
+    setBulkSaving(false)
   }
 
   const statusCount = {
@@ -196,10 +278,47 @@ export default function RekonsiliasiPage() {
               </select>
             </div>
           </div>
+
+          {selectedIds.length > 0 && (
+            <div className="px-5 py-3 border-b flex flex-wrap gap-4 items-center justify-between" style={{ background: 'rgba(59,130,246,0.05)', borderColor: 'var(--bg-border)' }}>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
+                  {selectedIds.length} dipilih
+                </span>
+                <span className="text-xs text-secondary ml-2">Terapkan aksi massal:</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <select className="input-dark text-xs py-1" style={{ width: 140 }} value={bulkKem} onChange={e => setBulkKem(e.target.value)}>
+                  <option value="">— Kementerian —</option>
+                  {kementerian.map((k: any) => <option key={k.id} value={k.id}>{k.nama}</option>)}
+                </select>
+                <select className="input-dark text-xs py-1" style={{ width: 140 }} value={bulkJenis} onChange={e => setBulkJenis(e.target.value)}>
+                  <option value="">— Jenis —</option>
+                  {jenisTransaksi.map((j: any) => <option key={j.id} value={j.id}>{j.nama}</option>)}
+                </select>
+                <select className="input-dark text-xs py-1" style={{ width: 140 }} value={bulkProgram} onChange={e => setBulkProgram(e.target.value)}>
+                  <option value="">— Program Event —</option>
+                  {programEvent.map((p: any) => <option key={p.id} value={p.id}>{p.nama}</option>)}
+                </select>
+                <button onClick={applyBulkEdit} disabled={bulkSaving} className="btn-primary py-1 px-4 text-xs font-medium h-[28px]">
+                  {bulkSaving ? 'Menyimpan...' : 'Terapkan'}
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="overflow-x-auto max-h-96 overflow-y-auto">
             <table className="w-full text-xs">
               <thead className="sticky top-0" style={{ background: 'var(--bg-card)' }}>
                 <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
+                  <th className="px-4 py-2 w-[40px] text-center">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500/50"
+                      checked={qrisData.length > 0 && selectedIds.length === qrisData.length}
+                      onChange={toggleSelectAll}
+                    />
+                  </th>
                   <th className="text-left px-4 py-2 uppercase font-medium cursor-pointer hover:text-white transition-colors" style={{ color: sortBy === 'created_date' ? 'var(--accent-gold)' : 'var(--text-secondary)' }} onClick={() => { setSortBy('created_date'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') }}>
                     Tanggal {sortBy === 'created_date' && (sortOrder === 'asc' ? '↑' : '↓')}
                   </th>
@@ -215,6 +334,9 @@ export default function RekonsiliasiPage() {
                   <th className="text-left px-4 py-2 uppercase font-medium cursor-pointer hover:text-white transition-colors" style={{ color: sortBy === 'jenis_transaksi_id' ? 'var(--accent-gold)' : 'var(--text-secondary)' }} onClick={() => { setSortBy('jenis_transaksi_id'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') }}>
                     Jenis {sortBy === 'jenis_transaksi_id' && (sortOrder === 'asc' ? '↑' : '↓')}
                   </th>
+                  <th className="text-left px-4 py-2 uppercase font-medium cursor-pointer hover:text-white transition-colors" style={{ color: sortBy === 'program_event_id' ? 'var(--accent-gold)' : 'var(--text-secondary)' }} onClick={() => { setSortBy('program_event_id'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') }}>
+                    Kegiatan {sortBy === 'program_event_id' && (sortOrder === 'asc' ? '↑' : '↓')}
+                  </th>
                   <th className="text-left px-4 py-2 uppercase font-medium cursor-pointer hover:text-white transition-colors" style={{ color: sortBy === 'status' ? 'var(--accent-gold)' : 'var(--text-secondary)' }} onClick={() => { setSortBy('status'); setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc') }}>
                     Status {sortBy === 'status' && (sortOrder === 'asc' ? '↑' : '↓')}
                   </th>
@@ -222,9 +344,17 @@ export default function RekonsiliasiPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={6} className="text-center py-10"><div className="spinner mx-auto" /></td></tr>
+                  <tr><td colSpan={9} className="text-center py-10"><div className="spinner mx-auto" /></td></tr>
                 ) : qrisData.map(q => (
                   <tr key={q.id} className="table-row-hover" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                    <td className="px-4 py-2.5 text-center">
+                      <input
+                        type="checkbox"
+                        className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500/50"
+                        checked={selectedIds.includes(q.id)}
+                        onChange={() => toggleSelect(q.id)}
+                      />
+                    </td>
                     <td className="px-4 py-2.5">{q.created_date?.substring(0, 10)}</td>
                     <td className="px-4 py-2.5" style={{ maxWidth: 160 }}>
                       <div className="truncate">{q.merchant_name}</div>
@@ -235,6 +365,9 @@ export default function RekonsiliasiPage() {
                     </td>
                     <td className="px-4 py-2.5" style={{ color: 'var(--text-secondary)' }}>
                       {q.jenis_transaksi?.nama || '—'}
+                    </td>
+                    <td className="px-4 py-2.5" style={{ color: 'var(--text-secondary)' }}>
+                      {q.program_event?.nama || '—'}
                     </td>
                     <td className="px-4 py-2.5">
                       <span className={`px-2 py-0.5 rounded text-xs ${q.status === 'matched' ? 'badge-valid' :

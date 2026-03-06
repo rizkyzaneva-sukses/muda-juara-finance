@@ -76,3 +76,28 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
+
+export async function PATCH(req: NextRequest) {
+  if (!isAdminRequest(req)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const { ids, updates } = await req.json()
+    if (!ids || !updates || !Array.isArray(ids)) {
+      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('transaksi_qris')
+      .update(updates)
+      .in('id', ids)
+      .select()
+
+    if (error) throw error
+
+    return NextResponse.json({ updated: data?.length, data })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}
