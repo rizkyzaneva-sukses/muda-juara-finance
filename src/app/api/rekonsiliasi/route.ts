@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     let jumlahMatched = 0
     let jumlahPending = 0
 
-    for (const [date, qris] of qrisByDate) {
+    Array.from(qrisByDate.entries()).forEach(([date, qris]) => {
       totalQris += qris.total
 
       // Try same day first, then next day
@@ -76,10 +76,11 @@ export async function POST(req: NextRequest) {
         })
 
         // Update QRIS status to matched
-        await supabaseAdmin
+        supabaseAdmin
           .from('transaksi_qris')
           .update({ status: 'matched', matched_transaksi_id: bcaMatch.id })
           .in('id', qris.ids)
+          .then(() => { })
       } else {
         jumlahPending += qris.ids.length
         results.push({
@@ -93,7 +94,7 @@ export async function POST(req: NextRequest) {
           status: 'unmatched',
         })
       }
-    }
+    })
 
     // Save log
     const today = new Date().toISOString().substring(0, 10)
