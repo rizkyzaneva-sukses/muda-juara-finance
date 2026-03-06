@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  body {
+    background-color: #0a0d14;
+    color: #e2e8f0;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Outfit', sans-serif;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-dark-700 border border-white/5 rounded-xl p-4;
+  }
+  .btn-primary {
+    @apply bg-gold-500 hover:bg-gold-400 text-dark-900 font-semibold px-4 py-2 rounded-lg transition-all text-sm;
+  }
+  .btn-secondary {
+    @apply bg-dark-600 hover:bg-dark-500 text-white/80 border border-white/10 px-4 py-2 rounded-lg transition-all text-sm;
+  }
+  .btn-danger {
+    @apply bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/20 px-4 py-2 rounded-lg transition-all text-sm;
+  }
+  .input {
+    @apply bg-dark-600 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/90 w-full focus:outline-none focus:border-gold-500/50 transition-colors;
+  }
+  .select {
+    @apply bg-dark-600 border border-white/10 rounded-lg px-3 py-2 text-sm text-white/90 w-full focus:outline-none focus:border-gold-500/50 transition-colors;
+  }
+  .badge-valid { @apply bg-emerald-500/20 text-emerald-400 text-xs px-2 py-0.5 rounded-full; }
+  .badge-manual { @apply bg-amber-500/20 text-amber-400 text-xs px-2 py-0.5 rounded-full; }
+  .badge-koreksi { @apply bg-blue-500/20 text-blue-400 text-xs px-2 py-0.5 rounded-full; }
+  .badge-lainnya { @apply bg-slate-500/20 text-slate-400 text-xs px-2 py-0.5 rounded-full; }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: #0f1320; }
+::-webkit-scrollbar-thumb { background: #2a3352; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #f0a500; }
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fadeIn 0.3s ease forwards; }
+
+@keyframes shimmer {
+  0% { background-position: -1000px 0; }
+  100% { background-position: 1000px 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, #141928 25%, #1a2035 50%, #141928 75%);
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+  border-radius: 6px;
+}

@@ -1,0 +1,189 @@
+-- ============================================
+-- MUDA JUARA FINANCE - SUPABASE SCHEMA
+-- ============================================
+
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ============================================
+-- MASTER DATA TABLES
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS kementerian (
+  id SERIAL PRIMARY KEY,
+  kode VARCHAR(2) UNIQUE NOT NULL,
+  nama VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS jenis_transaksi (
+  id SERIAL PRIMARY KEY,
+  kode VARCHAR(2) UNIQUE NOT NULL,
+  nama VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS kategori_pengeluaran (
+  id SERIAL PRIMARY KEY,
+  nama VARCHAR(255) NOT NULL,
+  kelompok VARCHAR(100),
+  deskripsi TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS program_event (
+  id SERIAL PRIMARY KEY,
+  nama VARCHAR(255) NOT NULL,
+  kementerian_id INTEGER REFERENCES kementerian(id) ON DELETE SET NULL,
+  jenis_transaksi_id INTEGER REFERENCES jenis_transaksi(id) ON DELETE SET NULL,
+  deskripsi TEXT,
+  tanggal_mulai DATE,
+  tanggal_selesai DATE,
+  target_dana BIGINT DEFAULT 0,
+  is_rutin BOOLEAN DEFAULT false,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS rekening (
+  id SERIAL PRIMARY KEY,
+  nama VARCHAR(255) NOT NULL,
+  bank VARCHAR(100) NOT NULL,
+  nomor_rekening VARCHAR(50),
+  saldo_awal BIGINT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Legacy kategori table (backward compat)
+CREATE TABLE IF NOT EXISTS kategori_lainnya (
+  id SERIAL PRIMARY KEY,
+  nama VARCHAR(255) NOT NULL,
+  jenis_transaksi_id INTEGER REFERENCES jenis_transaksi(id) ON DELETE SET NULL,
+  deskripsi TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- ============================================
+-- TRANSACTION TABLES
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS transaksi (
+  id SERIAL PRIMARY KEY,
+  tanggal DATE NOT NULL,
+  keterangan TEXT,
+  jumlah BIGINT NOT NULL,
+  tipe VARCHAR(10) CHECK (tipe IN ('masuk', 'keluar')) NOT NULL,
+  sumber VARCHAR(20) CHECK (sumber IN ('BCA', 'BSI', 'manual')) NOT NULL DEFAULT 'manual',
+  status VARCHAR(20) CHECK (status IN ('valid', 'cek_manual', 'koreksi', 'lainnya')) NOT NULL DEFAULT 'cek_manual',
+  kementerian_id INTEGER REFERENCES kementerian(id) ON DELETE SET NULL,
+  jenis_transaksi_id INTEGER REFERENCES jenis_transaksi(id) ON DELETE SET NULL,
+  kategori_pengeluaran_id INTEGER REFERENCES kategori_pengeluaran(id) ON DELETE SET NULL,
+  program_event_id INTEGER REFERENCES program_event(id) ON DELETE SET NULL,
+  kategori_lainnya_id INTEGER REFERENCES kategori_lainnya(id) ON DELETE SET NULL,
+  raw_data JSONB,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS transaksi_qris (
+  id SERIAL PRIMARY KEY,
+  created_date TIMESTAMP,
+  merchant_name VARCHAR(255),
+  merchant_id VARCHAR(100),
+  tid VARCHAR(100),
+  amount BIGINT NOT NULL,
+  transaction_type VARCHAR(100),
+  kementerian_id INTEGER REFERENCES kementerian(id) ON DELETE SET NULL,
+  jenis_transaksi_id INTEGER REFERENCES jenis_transaksi(id) ON DELETE SET NULL,
+  program_event_id INTEGER REFERENCES program_event(id) ON DELETE SET NULL,
+  status VARCHAR(20) CHECK (status IN ('pending', 'matched', 'cek_manual')) DEFAULT 'pending',
+  matched_transaksi_id INTEGER REFERENCES transaksi(id) ON DELETE SET NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS log_rekonsiliasi (
+  id SERIAL PRIMARY KEY,
+  tanggal_rekonsiliasi DATE NOT NULL,
+  periode_mulai DATE,
+  periode_selesai DATE,
+  total_qris BIGINT DEFAULT 0,
+  total_cair_bank BIGINT DEFAULT 0,
+  selisih BIGINT DEFAULT 0,
+  persentase_biaya DECIMAL(5,2) DEFAULT 0,
+  jumlah_matched INTEGER DEFAULT 0,
+  jumlah_pending INTEGER DEFAULT 0,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- ============================================
+-- INDEXES
+-- ============================================
+
+CREATE INDEX IF NOT EXISTS idx_transaksi_tanggal ON transaksi(tanggal);
+CREATE INDEX IF NOT EXISTS idx_transaksi_tipe ON transaksi(tipe);
+CREATE INDEX IF NOT EXISTS idx_transaksi_status ON transaksi(status);
+CREATE INDEX IF NOT EXISTS idx_transaksi_sumber ON transaksi(sumber);
+CREATE INDEX IF NOT EXISTS idx_transaksi_kementerian ON transaksi(kementerian_id);
+CREATE INDEX IF NOT EXISTS idx_qris_status ON transaksi_qris(status);
+CREATE INDEX IF NOT EXISTS idx_qris_tanggal ON transaksi_qris(created_date);
+
+-- ============================================
+-- SEED MASTER DATA
+-- ============================================
+
+-- Kementerian
+INSERT INTO kementerian (kode, nama) VALUES
+('00', 'Keuangan'),
+('01', 'Kementerian SDM'),
+('02', 'Kementerian Ekonomi'),
+('03', 'Kementerian Pendidikan'),
+('04', 'Kementerian Sosial'),
+('05', 'KemenPorPar'),
+('06', 'Kementerian Luar Negeri'),
+('07', 'Kominfo'),
+('08', 'Kementerian Muslimah'),
+('09', 'Menkumham & Nilai')
+ON CONFLICT (kode) DO NOTHING;
+
+-- Jenis Transaksi
+INSERT INTO jenis_transaksi (kode, nama) VALUES
+('10', 'Sponsor'),
+('11', 'Pendaftaran'),
+('12', 'Infaq - Kegiatan MJ'),
+('13', 'Donasi Umum'),
+('15', 'Infaq Shubuh'),
+('16', 'Wakaf Pembangunan Masjid'),
+('17', 'Kegiatan MJ'),
+('96', 'Yayasan'),
+('97', 'Pengembalian Biaya Transfer BI-Fast')
+ON CONFLICT (kode) DO NOTHING;
+
+-- Kategori Pengeluaran
+INSERT INTO kategori_pengeluaran (nama, kelompok, deskripsi) VALUES
+('Konsumsi / Catering', 'Operasional Acara', 'Biaya makan dan minum'),
+('Sewa Venue / DP Venue', 'Operasional Acara', 'Biaya sewa atau DP tempat acara'),
+('Dekorasi & Properti', 'Operasional Acara', 'Biaya dekorasi dan properti acara'),
+('Dokumentasi', 'Operasional Acara', 'Biaya foto dan video'),
+('Perlengkapan Acara', 'Operasional Acara', 'Biaya perlengkapan dan peralatan'),
+('Transportasi Panitia', 'Operasional Acara', 'Biaya transportasi panitia'),
+('Akomodasi / Penginapan', 'Operasional Acara', 'Biaya penginapan'),
+('Honorarium Pembicara / Ustadz', 'SDM & Apresiasi', 'Honor narasumber dan ustadz'),
+('Santunan', 'SDM & Apresiasi', 'Pemberian santunan'),
+('Hadiah & Doorprize', 'SDM & Apresiasi', 'Hadiah dan doorprize'),
+('Seragam / Merchandise', 'SDM & Apresiasi', 'Biaya seragam dan merchandise'),
+('Sertifikat & Plakat', 'SDM & Apresiasi', 'Biaya sertifikat dan plakat'),
+('Biaya Admin Bank', 'Keuangan & Admin', 'Biaya administrasi bank'),
+('Pajak', 'Keuangan & Admin', 'Kewajiban pajak'),
+('Zakat', 'Program Sosial & Syariah', 'Zakat organisasi'),
+('Infaq Program', 'Program Sosial & Syariah', 'Infaq untuk program'),
+('Sedekah / Santunan Yatim', 'Program Sosial & Syariah', 'Sedekah dan santunan yatim'),
+('Wakaf', 'Program Sosial & Syariah', 'Dana wakaf'),
+('Umroh / Perjalanan Religi', 'Investasi & Pengembangan', 'Biaya umroh dan perjalanan religi'),
+('Pelatihan & Workshop', 'Investasi & Pengembangan', 'Biaya pelatihan'),
+('Pembelian Aset', 'Investasi & Pengembangan', 'Pembelian aset organisasi'),
+('Dana Darurat Organisasi', 'Investasi & Pengembangan', 'Dana darurat');
+
+-- Rekening
+INSERT INTO rekening (nama, bank, nomor_rekening, saldo_awal) VALUES
+('BCA Syariah - Muda Juara', 'BCA Syariah', '0590040242', 0),
+('BSI - Yayasan Muda Karya Mulia', 'BSI', '7188888172', 0)
+ON CONFLICT DO NOTHING;
