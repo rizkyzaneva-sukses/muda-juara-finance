@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     const toInsert = transactions.map((t: any) => ({
       tanggal: t.tanggal,
       keterangan: t.keterangan,
-      jumlah: t.jumlah,
+      jumlah: Math.round(Number(t.jumlah)),
       tipe: t.tipe,
       sumber: t.sumber,
       status: t.status,

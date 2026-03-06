@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
       merchant_name: r.merchant_name,
       merchant_id: r.merchant_id,
       tid: r.tid,
-      amount: r.amount,
+      amount: Math.round(Number(r.amount)),
       transaction_type: r.transaction_type,
       kementerian_id: r.kementerian_id,
       jenis_transaksi_id: r.jenis_transaksi_id,
