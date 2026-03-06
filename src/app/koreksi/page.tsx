@@ -130,14 +130,18 @@ export default function KoreksiPage() {
               <option value="">Kementerian</option>
               {kementerian.map(k => <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>)}
             </select>
-            <select value={bulkJenis} onChange={e => setBulkJenis(e.target.value)} className="input-dark text-xs" style={{ width: 160 }}>
-              <option value="">Jenis (Masuk)</option>
-              {jenisTransaksi.map(j => <option key={j.id} value={j.id}>{j.kode} - {j.nama}</option>)}
-            </select>
-            <select value={bulkKat} onChange={e => setBulkKat(e.target.value)} className="input-dark text-xs" style={{ width: 180 }}>
-              <option value="">Kategori (Keluar)</option>
-              {kategoriPengeluaran.map(k => <option key={k.id} value={k.id}>{k.nama}</option>)}
-            </select>
+            {Array.from(selected).some(id => transaksi.find(t => t.id === id)?.tipe === 'masuk') && (
+              <select value={bulkJenis} onChange={e => setBulkJenis(e.target.value)} className="input-dark text-xs" style={{ width: 160 }}>
+                <option value="">Jenis (Masuk)</option>
+                {jenisTransaksi.map(j => <option key={j.id} value={j.id}>{j.kode} - {j.nama}</option>)}
+              </select>
+            )}
+            {Array.from(selected).some(id => transaksi.find(t => t.id === id)?.tipe === 'keluar') && (
+              <select value={bulkKat} onChange={e => setBulkKat(e.target.value)} className="input-dark text-xs" style={{ width: 180 }}>
+                <option value="">Kategori (Keluar)</option>
+                {kategoriPengeluaran.map(k => <option key={k.id} value={k.id}>{k.nama}</option>)}
+              </select>
+            )}
             <button onClick={applyBulk} className="btn-primary text-xs">Terapkan ke Semua</button>
             <button onClick={() => setSelected(new Set())} className="btn-secondary text-xs">Batal</button>
           </div>
