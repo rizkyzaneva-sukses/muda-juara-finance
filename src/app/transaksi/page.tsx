@@ -321,7 +321,7 @@ export default function TransaksiPage() {
                                 : <TrendingDown size={11} style={{ color: '#ef4444' }} />
                               }
                             </div>
-                            <span className="text-sm truncate" style={{ maxWidth: 260 }}>{t.keterangan}</span>
+                            <span className="text-sm break-words whitespace-normal leading-relaxed max-w-[300px] lg:max-w-[400px]">{t.keterangan}</span>
                           </div>
                         </td>
                         <td className="px-5 py-3 text-right font-medium text-sm" style={{ color: t.tipe === 'masuk' ? '#22c55e' : '#ef4444', whiteSpace: 'nowrap' }}>
