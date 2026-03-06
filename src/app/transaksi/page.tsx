@@ -24,7 +24,6 @@ export default function TransaksiPage() {
   const [bulkKem, setBulkKem] = useState<string>('')
   const [bulkProgram, setBulkProgram] = useState<string>('')
   const [bulkJenis, setBulkJenis] = useState<string>('')
-  const [bulkKategori, setBulkKategori] = useState<string>('')
   const [bulkSaving, setBulkSaving] = useState(false)
 
   useEffect(() => {
@@ -116,7 +115,7 @@ export default function TransaksiPage() {
 
   const applyBulkEdit = async () => {
     if (selectedIds.length === 0) return
-    if (!bulkKem && !bulkProgram && !bulkJenis && !bulkKategori) {
+    if (!bulkKem && !bulkProgram && !bulkJenis) {
       alert("Pilih setidaknya satu data yang ingin diubah")
       return
     }
@@ -128,7 +127,6 @@ export default function TransaksiPage() {
     if (bulkKem) updates.kementerian_id = bulkKem
     if (bulkProgram) updates.program_event_id = bulkProgram
     if (bulkJenis) updates.jenis_transaksi_id = bulkJenis
-    if (bulkKategori) updates.kategori_pengeluaran_id = bulkKategori
 
     try {
       const res = await fetch('/api/transaksi', {
@@ -146,7 +144,6 @@ export default function TransaksiPage() {
       setBulkKem('')
       setBulkProgram('')
       setBulkJenis('')
-      setBulkKategori('')
       fetchData() // reload data
     } catch (e: any) {
       alert(e.message || "Gagal menyimpan data masal")
@@ -248,23 +245,10 @@ export default function TransaksiPage() {
                   {kementerian.map((k: any) => <option key={k.id} value={k.id}>{k.nama}</option>)}
                 </select>
 
-                {(() => {
-                  const isAllSelectedKeluar = selectedIds.length > 0 && selectedIds.every(id => data.find(d => d.id === id)?.tipe === 'keluar');
-                  if (isAllSelectedKeluar) {
-                    return (
-                      <select className="input-dark text-xs py-1" style={{ width: 140 }} value={bulkKategori} onChange={e => setBulkKategori(e.target.value)}>
-                        <option value="">— Pengeluaran —</option>
-                        {kategoriPengeluaran.map((kp: any) => <option key={kp.id} value={kp.id}>{kp.nama}</option>)}
-                      </select>
-                    );
-                  }
-                  return (
-                    <select className="input-dark text-xs py-1" style={{ width: 140 }} value={bulkJenis} onChange={e => setBulkJenis(e.target.value)}>
-                      <option value="">— Jenis Transaksi —</option>
-                      {jenisTransaksi.map((j: any) => <option key={j.id} value={j.id}>{j.nama}</option>)}
-                    </select>
-                  );
-                })()}
+                <select className="input-dark text-xs py-1" style={{ width: 140 }} value={bulkJenis} onChange={e => setBulkJenis(e.target.value)}>
+                  <option value="">— Jenis Transaksi —</option>
+                  {jenisTransaksi.map((j: any) => <option key={j.id} value={j.id}>{j.nama}</option>)}
+                </select>
 
                 <select className="input-dark text-xs py-1" style={{ width: 140 }} value={bulkProgram} onChange={e => setBulkProgram(e.target.value)}>
                   <option value="">— Program Event —</option>

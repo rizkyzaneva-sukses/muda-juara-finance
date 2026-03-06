@@ -129,27 +129,28 @@ export async function GET(req: NextRequest) {
     // Process pengeluaran
     allTrx?.filter(t => t.tipe === 'keluar').forEach(t => {
       const kemId = t.kementerian_id || 'tanpa'
+      const jenisId = t.jenis_transaksi_id || 'tanpa'
       const progId = t.program_event_id || 'belum'
 
       // Find matching masuk entry or create pengeluaran entry
       let found = false
       rincianMap.forEach((entry, key) => {
-        if (entry.kementerian_id === t.kementerian_id && entry.program_id === t.program_event_id) {
+        if (entry.kementerian_id === t.kementerian_id && entry.jenis_id === t.jenis_transaksi_id && entry.program_id === t.program_event_id) {
           entry.pengeluaran += t.jumlah
           found = true
         }
       })
 
       if (!found) {
-        const key = `keluar-${kemId}-${progId}`
+        const key = `keluar-${kemId}-${jenisId}-${progId}`
         if (!rincianMap.has(key)) {
           rincianMap.set(key, {
             kementerian_id: t.kementerian_id,
             kementerian_kode: t.kementerian?.kode || null,
             kementerian_nama: t.kementerian?.nama || 'Tanpa Kementerian',
-            jenis_id: null,
-            jenis_kode: null,
-            jenis_nama: t.kategori_pengeluaran?.nama || 'Pengeluaran',
+            jenis_id: t.jenis_transaksi_id,
+            jenis_kode: t.jenis_transaksi?.kode || null,
+            jenis_nama: t.jenis_transaksi?.nama || 'Pengeluaran',
             program_id: t.program_event_id,
             program_nama: t.program_event?.nama || 'Tanpa Program',
             txn: 0, qris: 0, transfer: 0, pengeluaran: 0, sisa: 0, persen: 0
