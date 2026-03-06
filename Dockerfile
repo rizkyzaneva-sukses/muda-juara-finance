@@ -29,6 +29,9 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY package*.json ./
 COPY . .
 
+# Ensure public dir exists (required by Next.js standalone)
+RUN mkdir -p public
+
 RUN npm run build
 
 FROM node:20-alpine AS runner
@@ -37,6 +40,9 @@ ENV NODE_ENV=production
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
+
+# Create public dir in runner if not exists
+RUN mkdir -p public
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
