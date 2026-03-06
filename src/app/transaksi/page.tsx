@@ -18,10 +18,11 @@ export default function TransaksiPage() {
   // Bulk Assign States & Master Data
   const [kementerian, setKementerian] = useState<any[]>([])
   const [programEvent, setProgramEvent] = useState<any[]>([])
+  const [jenisTransaksi, setJenisTransaksi] = useState<any[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [bulkKem, setBulkKem] = useState<string>('')
   const [bulkProgram, setBulkProgram] = useState<string>('')
-  const [bulkSumber, setBulkSumber] = useState<string>('')
+  const [bulkJenis, setBulkJenis] = useState<string>('')
   const [bulkSaving, setBulkSaving] = useState(false)
 
   useEffect(() => {
@@ -35,12 +36,14 @@ export default function TransaksiPage() {
 
   const loadMasterData = async () => {
     try {
-      const [k, pe] = await Promise.all([
+      const [k, pe, j] = await Promise.all([
         fetch('/api/master?entity=kementerian').then(r => r.json()),
         fetch('/api/master?entity=program-event').then(r => r.json()),
+        fetch('/api/master?entity=jenis-transaksi').then(r => r.json()),
       ])
       setKementerian(k.data || [])
       setProgramEvent(pe.data || [])
+      setJenisTransaksi(j.data || [])
     } catch (e) {
       console.error("Gagal memuat master data")
     }
@@ -109,7 +112,7 @@ export default function TransaksiPage() {
 
   const applyBulkEdit = async () => {
     if (selectedIds.length === 0) return
-    if (!bulkKem && !bulkProgram && !bulkSumber) {
+    if (!bulkKem && !bulkProgram && !bulkJenis) {
       alert("Pilih setidaknya satu data yang ingin diubah")
       return
     }
@@ -120,7 +123,7 @@ export default function TransaksiPage() {
     const updates: any = {}
     if (bulkKem) updates.kementerian_id = bulkKem
     if (bulkProgram) updates.program_event_id = bulkProgram
-    if (bulkSumber) updates.sumber = bulkSumber
+    if (bulkJenis) updates.jenis_transaksi_id = bulkJenis
 
     try {
       const res = await fetch('/api/transaksi', {
@@ -137,7 +140,7 @@ export default function TransaksiPage() {
       setSelectedIds([])
       setBulkKem('')
       setBulkProgram('')
-      setBulkSumber('')
+      setBulkJenis('')
       fetchData() // reload data
     } catch (e: any) {
       alert(e.message || "Gagal menyimpan data masal")
@@ -210,15 +213,13 @@ export default function TransaksiPage() {
                   <option value="">— Kementerian —</option>
                   {kementerian.map((k: any) => <option key={k.id} value={k.id}>{k.nama}</option>)}
                 </select>
+                <select className="input-dark text-xs py-1" style={{ width: 140 }} value={bulkJenis} onChange={e => setBulkJenis(e.target.value)}>
+                  <option value="">— Jenis Transaksi —</option>
+                  {jenisTransaksi.map((j: any) => <option key={j.id} value={j.id}>{j.nama}</option>)}
+                </select>
                 <select className="input-dark text-xs py-1" style={{ width: 140 }} value={bulkProgram} onChange={e => setBulkProgram(e.target.value)}>
                   <option value="">— Program Event —</option>
                   {programEvent.map((p: any) => <option key={p.id} value={p.id}>{p.nama}</option>)}
-                </select>
-                <select className="input-dark text-xs py-1" style={{ width: 140 }} value={bulkSumber} onChange={e => setBulkSumber(e.target.value)}>
-                  <option value="">— Sumber —</option>
-                  <option value="BCA">BCA Syariah</option>
-                  <option value="BSI">BSI</option>
-                  <option value="manual">Manual</option>
                 </select>
                 <button onClick={applyBulkEdit} disabled={bulkSaving} className="btn-primary py-1 px-4 text-xs font-medium h-[28px]">
                   {bulkSaving ? 'Menyimpan...' : 'Terapkan'}
