@@ -63,7 +63,13 @@ export async function GET(req: NextRequest) {
       .range((page - 1) * limit, page * limit - 1)
 
     if (status) query = query.eq('status', status)
-    if (kemId) query = query.eq('kementerian_id', kemId)
+    if (kemId) {
+      if (kemId === 'null') {
+        query = query.is('kementerian_id', null)
+      } else {
+        query = query.eq('kementerian_id', kemId)
+      }
+    }
     if (dateFrom) query = query.gte('created_date', dateFrom)
     if (dateTo) query = query.lte('created_date', dateTo)
 

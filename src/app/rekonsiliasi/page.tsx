@@ -27,6 +27,7 @@ export default function RekonsiliasiPage() {
   const [bulkSaving, setBulkSaving] = useState(false)
 
   const [page, setPage] = useState(1)
+  const [kementerianFilter, setKementerianFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [sortBy, setSortBy] = useState('created_date')
   const [sortOrder, setSortOrder] = useState('desc')
@@ -37,7 +38,7 @@ export default function RekonsiliasiPage() {
   useEffect(() => {
     loadQris()
     setSelectedIds([]) // Reset selection on page or filter change
-  }, [page, statusFilter, sortBy, sortOrder, dateFrom, dateTo])
+  }, [page, statusFilter, kementerianFilter, sortBy, sortOrder, dateFrom, dateTo])
 
   useEffect(() => {
     loadLogs()
@@ -70,6 +71,7 @@ export default function RekonsiliasiPage() {
     params.append('limit', limit.toString())
     params.append('page', page.toString())
     if (statusFilter) params.append('status', statusFilter)
+    if (kementerianFilter) params.append('kementerian_id', kementerianFilter)
     if (sortBy) {
       params.append('sort_by', sortBy)
       params.append('sort_order', sortOrder)
@@ -300,6 +302,18 @@ export default function RekonsiliasiPage() {
                 <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>s/d</span>
                 <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }} className="input-dark text-xs py-1.5" />
               </div>
+              <select
+                value={kementerianFilter}
+                onChange={e => { setKementerianFilter(e.target.value); setPage(1); }}
+                className="input-dark text-xs py-1.5"
+                style={{ width: 150 }}
+              >
+                <option value="">Semua Kementrian</option>
+                <option value="null">Belum Di-assign</option>
+                {kementerian.map((k: any) => (
+                  <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>
+                ))}
+              </select>
               <select
                 value={statusFilter}
                 onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
