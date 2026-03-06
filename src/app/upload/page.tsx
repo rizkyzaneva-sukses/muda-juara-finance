@@ -22,6 +22,13 @@ export default function UploadPage() {
   const [kementerian, setKementerian] = useState<any[]>([])
   const [jenisTransaksi, setJenisTransaksi] = useState<any[]>([])
   const [kategoriPengeluaran, setKategoriPengeluaran] = useState<any[]>([])
+  const [programEvent, setProgramEvent] = useState<any[]>([])
+
+  // Bulk actions state
+  const [selectedIdx, setSelectedIdx] = useState<number[]>([])
+  const [bulkKem, setBulkKem] = useState<number | null>(null)
+  const [bulkJenis, setBulkJenis] = useState<number | null>(null)
+  const [bulkProgram, setBulkProgram] = useState<number | null>(null)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -29,14 +36,16 @@ export default function UploadPage() {
   }
 
   const loadMasterData = async () => {
-    const [k, j, kp] = await Promise.all([
+    const [k, j, kp, pe] = await Promise.all([
       fetch('/api/master?entity=kementerian').then(r => r.json()),
       fetch('/api/master?entity=jenis-transaksi').then(r => r.json()),
       fetch('/api/master?entity=kategori-pengeluaran').then(r => r.json()),
+      fetch('/api/master?entity=program-event').then(r => r.json()),
     ])
     setKementerian(k.data || [])
     setJenisTransaksi(j.data || [])
     setKategoriPengeluaran(kp.data || [])
+    setProgramEvent(pe.data || [])
   }
 
   // ─── QRIS (.xlsx) ──────────────────────────────────────────────────────────
@@ -73,24 +82,59 @@ export default function UploadPage() {
     setLoading(false)
   }
 
+  // Add an image compressor to avoid limits
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = e => {
+        const img = new window.Image()
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          let { width, height } = img
+          const MAX_SIZE = 1200 // Max 1200px
+          if (width > height && width > MAX_SIZE) {
+            height *= MAX_SIZE / width
+            width = MAX_SIZE
+          } else if (height > MAX_SIZE) {
+            width *= MAX_SIZE / height
+            height = MAX_SIZE
+          }
+          canvas.width = width
+          canvas.height = height
+          const ctx = canvas.getContext('2d')
+          ctx?.drawImage(img, 0, 0, width, height)
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8)
+          resolve(compressedDataUrl.split(',')[1]) // Return base64 without prefix
+        }
+        img.onerror = reject
+        img.src = e.target?.result as string
+      }
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
   // ─── Mutasi PDF atau Image ─────────────────────────────────────────────────
   const handleMutasiFile = async (file: File) => {
     await loadMasterData()
     setLoading(true)
     try {
-      // Convert to base64 — handle large files safely
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => {
-          const result = reader.result as string
-          // strip data URL prefix
-          resolve(result.split(',')[1])
-        }
-        reader.onerror = reject
-        reader.readAsDataURL(file)
-      })
+      let base64 = ''
+      let mimeType = mode === 'mutasi-pdf' ? 'application/pdf' : 'image/jpeg'
 
-      const mimeType = file.type || (mode === 'mutasi-pdf' ? 'application/pdf' : 'image/jpeg')
+      if (mode === 'mutasi-image') {
+        base64 = await compressImage(file)
+      } else {
+        // For PDF, we just use standard base64 parser
+        base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => {
+            resolve((reader.result as string).split(',')[1])
+          }
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+      }
 
       const token = localStorage.getItem('admin_token')
       const res = await fetch('/api/mutasi/parse', {
@@ -137,9 +181,38 @@ export default function UploadPage() {
     else handleMutasiFile(file)
   }
 
-  const removeRow = (idx: number) => setPreview(prev => prev.filter(r => r._idx !== idx))
+  const removeRow = (idx: number) => {
+    setPreview(prev => prev.filter(r => r._idx !== idx))
+    setSelectedIdx(prev => prev.filter(i => i !== idx))
+  }
   const updateRow = (idx: number, updates: any) =>
     setPreview(prev => prev.map(r => r._idx === idx ? { ...r, ...updates } : r))
+
+  // ─── Bulk Actions ──────────────────────────────────────────────────────────
+  const toggleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedIdx(preview.filter(r => !r.isDuplicate).map(r => r._idx))
+    } else {
+      setSelectedIdx([])
+    }
+  }
+
+  const toggleSelect = (idx: number) => {
+    setSelectedIdx(prev => prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx])
+  }
+
+  const applyBulk = () => {
+    if (selectedIdx.length === 0) return
+    const updates: any = {}
+    if (bulkKem) updates.kementerian_id = bulkKem
+    if (bulkJenis) updates.jenis_transaksi_id = bulkJenis
+    if (bulkProgram) updates.program_event_id = bulkProgram
+
+    setPreview(prev => prev.map(r => selectedIdx.includes(r._idx) ? { ...r, ...updates } : r))
+    setSelectedIdx([])
+    setBulkKem(null); setBulkJenis(null); setBulkProgram(null)
+    showToast(`${selectedIdx.length} baris diperbarui otomatis`)
+  }
 
   // ─── Save ──────────────────────────────────────────────────────────────────
   const saveQris = async () => {
@@ -376,31 +449,77 @@ export default function UploadPage() {
             </div>
 
             <div className="card overflow-hidden">
+              {/* Bulk Actions Toolbar */}
+              {selectedIdx.length > 0 && (
+                <div className="p-3 border-b flex items-center gap-3 bg-blue-500/10" style={{ borderColor: 'var(--bg-border)' }}>
+                  <span className="text-xs font-semibold px-2">{selectedIdx.length} Terpilih:</span>
+                  <select
+                    value={bulkKem || ''}
+                    onChange={e => setBulkKem(e.target.value ? parseInt(e.target.value) : null)}
+                    className="input-dark text-xs py-1.5"
+                    style={{ minWidth: 140 }}
+                  >
+                    <option value="">— Kementerian —</option>
+                    {kementerian.map((k: any) => <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>)}
+                  </select>
+                  <select
+                    value={bulkJenis || ''}
+                    onChange={e => setBulkJenis(e.target.value ? parseInt(e.target.value) : null)}
+                    className="input-dark text-xs py-1.5"
+                    style={{ minWidth: 140 }}
+                  >
+                    <option value="">— Jenis —</option>
+                    {jenisTransaksi.map((j: any) => <option key={j.id} value={j.id}>{j.kode} - {j.nama}</option>)}
+                  </select>
+                  <select
+                    value={bulkProgram || ''}
+                    onChange={e => setBulkProgram(e.target.value ? parseInt(e.target.value) : null)}
+                    className="input-dark text-xs py-1.5"
+                    style={{ minWidth: 140 }}
+                  >
+                    <option value="">— Program Event —</option>
+                    {programEvent.map((p: any) => <option key={p.id} value={p.id}>{p.nama}</option>)}
+                  </select>
+                  <button onClick={applyBulk} className="btn-primary py-1.5 px-3 text-xs flex items-center gap-1 ml-auto">
+                    <Check size={14} /> Terapkan
+                  </button>
+                </div>
+              )}
+
               <div className="overflow-x-auto max-h-96 overflow-y-auto">
                 <table className="w-full text-xs">
-                  <thead className="sticky top-0" style={{ background: 'var(--bg-card)' }}>
+                  <thead className="sticky top-0" style={{ background: 'var(--bg-card)', zIndex: 10 }}>
                     <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
+                      <th className="px-3 py-2 text-center w-10">
+                        <input
+                          type="checkbox"
+                          checked={preview.filter(r => !r.isDuplicate).length > 0 && selectedIdx.length === preview.filter(r => !r.isDuplicate).length}
+                          onChange={toggleSelectAll}
+                          className="rounded border-gray-600 bg-gray-700"
+                        />
+                      </th>
                       {mode === 'qris' ? (
                         <>
-                          <th className="text-left px-4 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Tanggal</th>
-                          <th className="text-left px-4 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Merchant</th>
-                          <th className="text-right px-4 py-2 text-xs uppercase" style={{ color: '#22c55e' }}>Jumlah</th>
-                          <th className="text-left px-4 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Kementerian</th>
-                          <th className="text-left px-4 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Jenis</th>
-                          <th className="text-left px-4 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Status</th>
-                          <th className="px-4 py-2"></th>
+                          <th className="text-left px-3 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Tanggal</th>
+                          <th className="text-left px-3 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Merchant</th>
+                          <th className="text-right px-3 py-2 text-xs uppercase" style={{ color: '#22c55e' }}>Jumlah</th>
+                          <th className="text-left px-3 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Kementerian</th>
+                          <th className="text-left px-3 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Jenis</th>
+                          <th className="text-left px-3 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Program</th>
+                          <th className="text-left px-3 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Status</th>
+                          <th className="px-3 py-2"></th>
                         </>
                       ) : (
                         <>
-                          <th className="text-left px-4 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Tanggal</th>
-                          <th className="text-left px-4 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Keterangan</th>
-                          <th className="text-right px-4 py-2 text-xs uppercase" style={{ color: '#ef4444' }}>Debit</th>
-                          <th className="text-right px-4 py-2 text-xs uppercase" style={{ color: '#22c55e' }}>Kredit</th>
-                          <th className="text-left px-4 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Tipe</th>
-                          <th className="text-left px-4 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Kementerian</th>
-                          <th className="text-left px-4 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Jenis/Kategori</th>
-                          <th className="text-left px-4 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Status</th>
-                          <th className="px-4 py-2"></th>
+                          <th className="text-left px-3 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Tanggal</th>
+                          <th className="text-left px-3 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Keterangan</th>
+                          <th className="text-right px-3 py-2 text-xs uppercase" style={{ color: '#ef4444' }}>Debit</th>
+                          <th className="text-right px-3 py-2 text-xs uppercase" style={{ color: '#22c55e' }}>Kredit</th>
+                          <th className="text-center px-3 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Tipe</th>
+                          <th className="text-left px-3 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Kementerian</th>
+                          <th className="text-left px-3 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Jenis/Ktg/Prog</th>
+                          <th className="text-center px-3 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Status</th>
+                          <th className="px-3 py-2"></th>
                         </>
                       )}
                     </tr>
@@ -415,51 +534,22 @@ export default function UploadPage() {
                           opacity: row.isDuplicate ? 0.6 : 1,
                         }}
                       >
+                        <td className="px-3 py-2 text-center">
+                          {!row.isDuplicate && (
+                            <input
+                              type="checkbox"
+                              checked={selectedIdx.includes(row._idx)}
+                              onChange={() => toggleSelect(row._idx)}
+                              className="rounded border-gray-600 bg-gray-700"
+                            />
+                          )}
+                        </td>
                         {mode === 'qris' ? (
                           <>
-                            <td className="px-4 py-2 whitespace-nowrap">{row.created_date?.substring(0, 10)}</td>
-                            <td className="px-4 py-2" style={{ maxWidth: 160 }}><div className="truncate">{row.merchant_name}</div></td>
-                            <td className="px-4 py-2 text-right font-medium" style={{ color: '#22c55e' }}>{formatRupiah(row.amount)}</td>
-                            <td className="px-4 py-2">
-                              <select
-                                value={row.kementerian_id || ''}
-                                onChange={e => updateRow(row._idx, { kementerian_id: e.target.value ? parseInt(e.target.value) : null })}
-                                className="input-dark text-xs py-1"
-                                style={{ minWidth: 140 }}
-                              >
-                                <option value="">— Pilih —</option>
-                                {kementerian.map((k: any) => <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>)}
-                              </select>
-                            </td>
-                            <td className="px-4 py-2">
-                              <select
-                                value={row.jenis_transaksi_id || ''}
-                                onChange={e => updateRow(row._idx, { jenis_transaksi_id: e.target.value ? parseInt(e.target.value) : null })}
-                                className="input-dark text-xs py-1"
-                                style={{ minWidth: 140 }}
-                              >
-                                <option value="">— Pilih —</option>
-                                {jenisTransaksi.map((j: any) => <option key={j.id} value={j.id}>{j.kode} - {j.nama}</option>)}
-                              </select>
-                            </td>
-                            <td className="px-4 py-2">
-                              <span className={`badge-${row.isDuplicate ? 'cek-manual' : 'valid'} text-xs px-2 py-0.5 rounded`}>
-                                {row.isDuplicate ? 'duplikat' : row.status}
-                              </span>
-                            </td>
-                          </>
-                        ) : (
-                          <>
-                            <td className="px-4 py-2 whitespace-nowrap">{row.tanggal}</td>
-                            <td className="px-4 py-2" style={{ maxWidth: 200 }}><div className="truncate">{row.keterangan}</div></td>
-                            <td className="px-4 py-2 text-right" style={{ color: '#ef4444' }}>{row.debit > 0 ? formatRupiah(row.debit) : '—'}</td>
-                            <td className="px-4 py-2 text-right" style={{ color: '#22c55e' }}>{row.kredit > 0 ? formatRupiah(row.kredit) : '—'}</td>
-                            <td className="px-4 py-2">
-                              <span className={`text-xs px-2 py-0.5 rounded ${row.tipe === 'masuk' ? 'badge-valid' : 'badge-lainnya'}`}>
-                                {row.tipe}
-                              </span>
-                            </td>
-                            <td className="px-4 py-2">
+                            <td className="px-3 py-2 whitespace-nowrap">{row.created_date?.substring(0, 10)}</td>
+                            <td className="px-3 py-2" style={{ maxWidth: 160 }}><div className="truncate">{row.merchant_name}</div></td>
+                            <td className="px-3 py-2 text-right font-medium" style={{ color: '#22c55e' }}>{formatRupiah(row.amount)}</td>
+                            <td className="px-3 py-2">
                               <select
                                 value={row.kementerian_id || ''}
                                 onChange={e => updateRow(row._idx, { kementerian_id: e.target.value ? parseInt(e.target.value) : null })}
@@ -470,37 +560,98 @@ export default function UploadPage() {
                                 {kementerian.map((k: any) => <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>)}
                               </select>
                             </td>
-                            <td className="px-4 py-2">
-                              {row.tipe === 'masuk' ? (
-                                <select
-                                  value={row.jenis_transaksi_id || ''}
-                                  onChange={e => updateRow(row._idx, { jenis_transaksi_id: e.target.value ? parseInt(e.target.value) : null })}
-                                  className="input-dark text-xs py-1"
-                                  style={{ minWidth: 140 }}
-                                >
-                                  <option value="">— Jenis —</option>
-                                  {jenisTransaksi.map((j: any) => <option key={j.id} value={j.id}>{j.kode} - {j.nama}</option>)}
-                                </select>
-                              ) : (
-                                <select
-                                  value={row.kategori_pengeluaran_id || ''}
-                                  onChange={e => updateRow(row._idx, { kategori_pengeluaran_id: e.target.value ? parseInt(e.target.value) : null })}
-                                  className="input-dark text-xs py-1"
-                                  style={{ minWidth: 140 }}
-                                >
-                                  <option value="">— Kategori —</option>
-                                  {kategoriPengeluaran.map((k: any) => <option key={k.id} value={k.id}>{k.nama}</option>)}
-                                </select>
-                              )}
+                            <td className="px-3 py-2">
+                              <select
+                                value={row.jenis_transaksi_id || ''}
+                                onChange={e => updateRow(row._idx, { jenis_transaksi_id: e.target.value ? parseInt(e.target.value) : null })}
+                                className="input-dark text-xs py-1"
+                                style={{ minWidth: 120 }}
+                              >
+                                <option value="">— Pilih —</option>
+                                {jenisTransaksi.map((j: any) => <option key={j.id} value={j.id}>{j.kode} - {j.nama}</option>)}
+                              </select>
                             </td>
-                            <td className="px-4 py-2">
-                              <span className={`badge-${row.isDuplicate ? 'cek-manual' : row.status === 'valid' ? 'valid' : 'cek-manual'} text-xs px-2 py-0.5 rounded`}>
+                            <td className="px-3 py-2">
+                              <select
+                                value={row.program_event_id || ''}
+                                onChange={e => updateRow(row._idx, { program_event_id: e.target.value ? parseInt(e.target.value) : null })}
+                                className="input-dark text-xs py-1"
+                                style={{ minWidth: 120 }}
+                              >
+                                <option value="">— Pilih Program —</option>
+                                {programEvent.map((p: any) => <option key={p.id} value={p.id}>{p.nama}</option>)}
+                              </select>
+                            </td>
+                            <td className="px-3 py-2">
+                              <span className={`badge-${row.isDuplicate ? 'cek-manual' : 'valid'} text-xs px-2 py-0.5 rounded`}>
+                                {row.isDuplicate ? 'duplikat' : row.status}
+                              </span>
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-3 py-2 whitespace-nowrap">{row.tanggal}</td>
+                            <td className="px-3 py-2" style={{ maxWidth: 180 }}><div className="truncate" title={row.keterangan}>{row.keterangan}</div></td>
+                            <td className="px-3 py-2 text-right" style={{ color: '#ef4444' }}>{row.debit > 0 ? formatRupiah(row.debit) : '—'}</td>
+                            <td className="px-3 py-2 text-right" style={{ color: '#22c55e' }}>{row.kredit > 0 ? formatRupiah(row.kredit) : '—'}</td>
+                            <td className="px-3 py-2 text-center">
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${row.tipe === 'masuk' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                                {row.tipe.toUpperCase()}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2">
+                              <select
+                                value={row.kementerian_id || ''}
+                                onChange={e => updateRow(row._idx, { kementerian_id: e.target.value ? parseInt(e.target.value) : null })}
+                                className="input-dark text-xs py-1"
+                                style={{ minWidth: 120, borderColor: row.tipe === 'masuk' && !row.kementerian_id ? 'var(--accent-gold)' : '' }}
+                              >
+                                <option value="">— Pilih —</option>
+                                {kementerian.map((k: any) => <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>)}
+                              </select>
+                            </td>
+                            <td className="px-3 py-2">
+                              <div className="flex flex-col gap-1">
+                                {row.tipe === 'masuk' ? (
+                                  <select
+                                    value={row.jenis_transaksi_id || ''}
+                                    onChange={e => updateRow(row._idx, { jenis_transaksi_id: e.target.value ? parseInt(e.target.value) : null })}
+                                    className="input-dark text-xs py-1"
+                                    style={{ minWidth: 130 }}
+                                  >
+                                    <option value="">— Jenis Trx —</option>
+                                    {jenisTransaksi.map((j: any) => <option key={j.id} value={j.id}>{j.kode} - {j.nama}</option>)}
+                                  </select>
+                                ) : (
+                                  <select
+                                    value={row.kategori_pengeluaran_id || ''}
+                                    onChange={e => updateRow(row._idx, { kategori_pengeluaran_id: e.target.value ? parseInt(e.target.value) : null })}
+                                    className="input-dark text-xs py-1"
+                                    style={{ minWidth: 130 }}
+                                  >
+                                    <option value="">— Kat. Keluar —</option>
+                                    {kategoriPengeluaran.map((k: any) => <option key={k.id} value={k.id}>{k.nama}</option>)}
+                                  </select>
+                                )}
+                                <select
+                                  value={row.program_event_id || ''}
+                                  onChange={e => updateRow(row._idx, { program_event_id: e.target.value ? parseInt(e.target.value) : null })}
+                                  className="input-dark text-[10px] py-0.5 mt-1"
+                                  style={{ minWidth: 130, opacity: 0.8 }}
+                                >
+                                  <option value="">— + Program —</option>
+                                  {programEvent.map((p: any) => <option key={p.id} value={p.id}>{p.nama}</option>)}
+                                </select>
+                              </div>
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <span className={`badge-${row.isDuplicate ? 'cek-manual' : row.status === 'valid' ? 'valid' : 'cek-manual'} text-[10px] px-1.5 py-0.5 rounded`}>
                                 {row.isDuplicate ? 'duplikat' : row.status}
                               </span>
                             </td>
                           </>
                         )}
-                        <td className="px-4 py-2">
+                        <td className="px-3 py-2">
                           <button onClick={() => removeRow(row._idx)} className="text-red-400 hover:text-red-300">
                             <Trash2 size={13} />
                           </button>

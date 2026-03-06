@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import pdfParse from 'pdf-parse'
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -13,6 +14,16 @@ export interface ParsedTransaction {
 }
 
 export async function parseBankStatementPDF(base64PDF: string): Promise<ParsedTransaction[]> {
+  // Convert base64 to buffer and extract text locally first
+  const buffer = Buffer.from(base64PDF, 'base64')
+  let rawText = ''
+  try {
+    const data = await pdfParse(buffer)
+    rawText = data.text
+  } catch (err) {
+    throw new Error('Gagal membaca text dari PDF')
+  }
+
   const response = await openai.chat.completions.create({
     model: 'gpt-4o',
     max_tokens: 4000,
@@ -20,8 +31,8 @@ export async function parseBankStatementPDF(base64PDF: string): Promise<ParsedTr
       {
         role: 'system',
         content: `Kamu adalah parser mutasi rekening bank Indonesia. 
-Ekstrak SEMUA transaksi dari mutasi rekening ini.
-Return HANYA JSON array, tidak ada teks lain, tidak ada markdown.
+Ekstrak SEMUA transaksi dari data teks mutasi rekening ini.
+Return HANYA JSON array, tidak ada teks lain, markdown, atau pembukaan/penutup.
 Setiap objek harus memiliki field:
 - tanggal: string format "YYYY-MM-DD"
 - keterangan: string (deskripsi transaksi)
@@ -34,18 +45,7 @@ Contoh output:
       },
       {
         role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: 'Parse semua transaksi dari mutasi rekening ini:',
-          },
-          {
-            type: 'image_url',
-            image_url: {
-              url: `data:application/pdf;base64,${base64PDF}`,
-            },
-          },
-        ],
+        content: `Parse semua transaksi dari teks mutasi rekening ini:\n\n${rawText}`,
       },
     ],
   })
