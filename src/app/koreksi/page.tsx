@@ -15,9 +15,10 @@ export default function KoreksiPage() {
   const [bulkKem, setBulkKem] = useState('')
   const [bulkJenis, setBulkJenis] = useState('')
   const [bulkKat, setBulkKat] = useState('')
+  const [tipeFilter, setTipeFilter] = useState('')
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
-  useEffect(() => { loadAll() }, [])
+  useEffect(() => { loadAll() }, [tipeFilter])
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type })
@@ -28,7 +29,7 @@ export default function KoreksiPage() {
     setLoading(true)
     const token = localStorage.getItem('admin_token')
     const [trxRes, kemRes, jenisRes, katRes, progRes] = await Promise.all([
-      fetch('/api/transaksi?status=cek_manual&limit=100'),
+      fetch(`/api/transaksi?status=cek_manual&limit=100${tipeFilter ? `&tipe=${tipeFilter}` : ''}`),
       fetch('/api/master?entity=kementerian'),
       fetch('/api/master?entity=jenis-transaksi'),
       fetch('/api/master?entity=kategori-pengeluaran'),
@@ -118,6 +119,16 @@ export default function KoreksiPage() {
               {transaksi.length} transaksi perlu diklasifikasikan
             </p>
           </div>
+          <select
+            value={tipeFilter}
+            onChange={(e) => setTipeFilter(e.target.value)}
+            className="input-dark text-xs py-1.5"
+            style={{ width: 150 }}
+          >
+            <option value="">Semua Tipe</option>
+            <option value="masuk">Pemasukan (+)</option>
+            <option value="keluar">Pengeluaran (-)</option>
+          </select>
         </div>
 
         {/* Bulk apply */}
