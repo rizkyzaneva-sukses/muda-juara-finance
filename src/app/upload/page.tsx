@@ -28,6 +28,7 @@ export default function UploadPage() {
   const [selectedIdx, setSelectedIdx] = useState<number[]>([])
   const [bulkKem, setBulkKem] = useState<number | null>(null)
   const [bulkJenis, setBulkJenis] = useState<number | null>(null)
+  const [bulkKategori, setBulkKategori] = useState<number | null>(null)
   const [bulkProgram, setBulkProgram] = useState<number | null>(null)
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -207,11 +208,12 @@ export default function UploadPage() {
     const updates: any = {}
     if (bulkKem) updates.kementerian_id = bulkKem
     if (bulkJenis) updates.jenis_transaksi_id = bulkJenis
+    if (bulkKategori) updates.kategori_pengeluaran_id = bulkKategori
     if (bulkProgram) updates.program_event_id = bulkProgram
 
     setPreview(prev => prev.map(r => selectedIdx.includes(r._idx) ? { ...r, ...updates } : r))
     setSelectedIdx([])
-    setBulkKem(null); setBulkJenis(null); setBulkProgram(null)
+    setBulkKem(null); setBulkJenis(null); setBulkKategori(null); setBulkProgram(null)
     showToast(`${selectedIdx.length} baris diperbarui otomatis`)
   }
 
@@ -473,15 +475,35 @@ export default function UploadPage() {
                     <option value="">— Kementerian —</option>
                     {kementerian.map((k: any) => <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>)}
                   </select>
-                  <select
-                    value={bulkJenis || ''}
-                    onChange={e => setBulkJenis(e.target.value ? parseInt(e.target.value) : null)}
-                    className="input-dark text-xs py-1.5"
-                    style={{ minWidth: 140 }}
-                  >
-                    <option value="">— Jenis —</option>
-                    {jenisTransaksi.map((j: any) => <option key={j.id} value={j.id}>{j.kode} - {j.nama}</option>)}
-                  </select>
+                  {(() => {
+                    const isAllSelectedKeluar = selectedIdx.length > 0 && selectedIdx.every(id => preview.find((r: any) => r._idx === id)?.tipe === 'keluar');
+
+                    if (isAllSelectedKeluar && mode !== 'qris') {
+                      return (
+                        <select
+                          value={bulkKategori || ''}
+                          onChange={e => setBulkKategori(e.target.value ? parseInt(e.target.value) : null)}
+                          className="input-dark text-xs py-1.5"
+                          style={{ minWidth: 140 }}
+                        >
+                          <option value="">— Pengeluaran —</option>
+                          {kategoriPengeluaran.map((kp: any) => <option key={kp.id} value={kp.id}>{kp.nama}</option>)}
+                        </select>
+                      )
+                    }
+
+                    return (
+                      <select
+                        value={bulkJenis || ''}
+                        onChange={e => setBulkJenis(e.target.value ? parseInt(e.target.value) : null)}
+                        className="input-dark text-xs py-1.5"
+                        style={{ minWidth: 140 }}
+                      >
+                        <option value="">— Jenis —</option>
+                        {jenisTransaksi.map((j: any) => <option key={j.id} value={j.id}>{j.kode} - {j.nama}</option>)}
+                      </select>
+                    )
+                  })()}
                   <select
                     value={bulkProgram || ''}
                     onChange={e => setBulkProgram(e.target.value ? parseInt(e.target.value) : null)}
