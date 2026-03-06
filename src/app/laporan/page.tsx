@@ -57,30 +57,33 @@ export default function LaporanPage() {
             <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
               Ringkasan transaksi dan mutasi kas
             </p>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+              * Seluruh angka pemasukan dari QRIS sudah dipotong biaya MDR 0.7% (Nilai Netto)
+            </p>
           </div>
         </div>
 
         {/* Filters */}
         <div className="card p-4 flex flex-wrap gap-3 items-center">
-          <input 
-            type="date" 
-            value={filters.date_from} 
-            onChange={e => setFilters(f => ({ ...f, date_from: e.target.value }))} 
-            className="input-dark text-xs" 
+          <input
+            type="date"
+            value={filters.date_from}
+            onChange={e => setFilters(f => ({ ...f, date_from: e.target.value }))}
+            className="input-dark text-xs"
             placeholder="Dari Tanggal"
           />
           <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>s/d</span>
-          <input 
-            type="date" 
-            value={filters.date_to} 
-            onChange={e => setFilters(f => ({ ...f, date_to: e.target.value }))} 
-            className="input-dark text-xs" 
+          <input
+            type="date"
+            value={filters.date_to}
+            onChange={e => setFilters(f => ({ ...f, date_to: e.target.value }))}
+            className="input-dark text-xs"
             placeholder="Sampai Tanggal"
           />
-          <select 
-            value={filters.kementerian_id} 
-            onChange={e => setFilters(f => ({ ...f, kementerian_id: e.target.value }))} 
-            className="input-dark text-xs" 
+          <select
+            value={filters.kementerian_id}
+            onChange={e => setFilters(f => ({ ...f, kementerian_id: e.target.value }))}
+            className="input-dark text-xs"
             style={{ width: 180 }}
           >
             <option value="">Semua Kementerian</option>
@@ -88,10 +91,10 @@ export default function LaporanPage() {
               <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>
             ))}
           </select>
-          <select 
-            value={filters.sumber} 
-            onChange={e => setFilters(f => ({ ...f, sumber: e.target.value }))} 
-            className="input-dark text-xs" 
+          <select
+            value={filters.sumber}
+            onChange={e => setFilters(f => ({ ...f, sumber: e.target.value }))}
+            className="input-dark text-xs"
             style={{ width: 140 }}
           >
             <option value="">Semua Sumber</option>
@@ -101,9 +104,9 @@ export default function LaporanPage() {
           </select>
 
           {Object.values(filters).some(v => v) && (
-            <button 
+            <button
               onClick={() => setFilters({ date_from: '', date_to: '', kementerian_id: '', sumber: '' })}
-              className="text-xs px-3 py-1.5 rounded ml-auto flex items-center gap-1" 
+              className="text-xs px-3 py-1.5 rounded ml-auto flex items-center gap-1"
               style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)' }}
             >
               Reset Filter
@@ -185,7 +188,7 @@ export default function LaporanPage() {
                     </thead>
                     <tbody>
                       {data?.by_kementerian?.length === 0 ? (
-                         <tr><td colSpan={3} className="text-center py-8 text-xs" style={{ color: 'var(--text-secondary)' }}>Tidak ada data</td></tr>
+                        <tr><td colSpan={3} className="text-center py-8 text-xs" style={{ color: 'var(--text-secondary)' }}>Tidak ada data</td></tr>
                       ) : data?.by_kementerian?.map((k: any, i: number) => (
                         <tr key={i} className="table-row-hover" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                           <td className="px-5 py-3 text-xs max-w-[200px] truncate">
@@ -226,7 +229,7 @@ export default function LaporanPage() {
                     </thead>
                     <tbody>
                       {data?.by_month?.length === 0 ? (
-                         <tr><td colSpan={3} className="text-center py-8 text-xs" style={{ color: 'var(--text-secondary)' }}>Tidak ada data</td></tr>
+                        <tr><td colSpan={3} className="text-center py-8 text-xs" style={{ color: 'var(--text-secondary)' }}>Tidak ada data</td></tr>
                       ) : data?.by_month?.map((m: any, i: number) => {
                         const date = new Date(m.month + '-01')
                         const monthName = date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })

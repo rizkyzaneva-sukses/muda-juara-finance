@@ -3,6 +3,10 @@ import { supabaseAdmin } from '@/lib/supabase'
 
 const MDR_RATE = 0.007;
 
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
 export async function GET(req: NextRequest) {
   try {
     // Get rekening saldo awal
@@ -14,10 +18,13 @@ export async function GET(req: NextRequest) {
     const rekeningBSI = rekening?.find(r => r.bank === 'BSI')
 
     // Get all transaksi
-    const { data: transaksi } = await supabaseAdmin
+    const { data: transaksi, error } = await supabaseAdmin
       .from('transaksi')
       .select('*')
       .in('status', ['valid', 'koreksi', 'lainnya'])
+
+    if (error) console.error('Error fetching trx:', error);
+    console.log('TRANS LENGTH:', transaksi?.length);
 
     let totalMasukBCA = rekeningBCA?.saldo_awal || 0
     let totalKeluarBCA = 0
