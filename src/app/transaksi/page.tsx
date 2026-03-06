@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
 import { formatRupiah } from '@/lib/qris'
-import { TrendingUp, TrendingDown, Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react'
+import { TrendingUp, TrendingDown, Search, Filter, ChevronLeft, ChevronRight, Edit2, Save, X } from 'lucide-react'
 
 export default function TransaksiPage() {
   const [data, setData] = useState<any[]>([])
@@ -12,6 +12,8 @@ export default function TransaksiPage() {
   const [filters, setFilters] = useState({
     status: '', tipe: '', sumber: '', search: '', date_from: '', date_to: ''
   })
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({ keterangan: '', jumlah: 0 })
 
   useEffect(() => { fetchData() }, [page, filters])
 
@@ -36,6 +38,30 @@ export default function TransaksiPage() {
     cek_manual: 'badge-cek-manual',
     koreksi: 'badge-koreksi',
     lainnya: 'badge-lainnya',
+  }
+
+  const saveEdit = async () => {
+    if (!editingId) return
+    const token = localStorage.getItem('admin_token')
+    try {
+      const res = await fetch('/api/transaksi', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          id: editingId,
+          keterangan: editForm.keterangan,
+          jumlah: Number(editForm.jumlah) || 0
+        })
+      })
+      if (!res.ok) throw new Error('Gagal update')
+      setEditingId(null)
+      fetchData()
+    } catch (e) {
+      alert("Gagal merubah data")
+    }
   }
 
   return (
@@ -101,52 +127,88 @@ export default function TransaksiPage() {
                   <th className="text-left px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Program</th>
                   <th className="text-left px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Sumber</th>
                   <th className="text-left px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Status</th>
+                  <th className="text-right px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Aksi</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr><td colSpan={7} className="text-center py-12"><div className="spinner mx-auto" /></td></tr>
-                ) : data.length === 0 ? (
-                  <tr><td colSpan={7} className="text-center py-12 text-sm" style={{ color: 'var(--text-secondary)' }}>Tidak ada data</td></tr>
                 ) : data.map(t => (
                   <tr key={t.id} className="table-row-hover" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                    <td className="px-5 py-3 text-xs" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{t.tanggal}</td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
-                          style={{ background: t.tipe === 'masuk' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)' }}>
-                          {t.tipe === 'masuk'
-                            ? <TrendingUp size={11} style={{ color: '#22c55e' }} />
-                            : <TrendingDown size={11} style={{ color: '#ef4444' }} />
-                          }
+                    {editingId === t.id ? (
+                      <td colSpan={8} className="px-5 py-3">
+                        <div className="flex items-center gap-3">
+                          <input
+                            className="input-dark text-xs flex-1"
+                            value={editForm.keterangan}
+                            placeholder="Keterangan..."
+                            onChange={e => setEditForm(f => ({ ...f, keterangan: e.target.value }))}
+                          />
+                          <input
+                            type="number"
+                            className="input-dark text-xs w-32"
+                            placeholder="Jumlah / Nominal"
+                            value={editForm.jumlah}
+                            onChange={e => setEditForm(f => ({ ...f, jumlah: Number(e.target.value) }))}
+                          />
+                          <button onClick={saveEdit} className="p-2 rounded hover:bg-green-500/20 text-green-500 transition-colors" title="Simpan" disabled={!editForm.keterangan || editForm.jumlah <= 0}>
+                            <Save size={16} />
+                          </button>
+                          <button onClick={() => setEditingId(null)} className="p-2 rounded hover:bg-red-500/20 text-red-500 transition-colors" title="Batal">
+                            <X size={16} />
+                          </button>
                         </div>
-                        <span className="text-sm truncate" style={{ maxWidth: 260 }}>{t.keterangan}</span>
-                      </div>
-                    </td>
-                    <td className="px-5 py-3 text-right font-medium text-sm" style={{ color: t.tipe === 'masuk' ? '#22c55e' : '#ef4444', whiteSpace: 'nowrap' }}>
-                      {t.tipe === 'masuk' ? '+' : '-'}{formatRupiah(t.jumlah)}
-                    </td>
-                    <td className="px-5 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                      {t.kementerian ? (
-                        <span className="flex items-center gap-1">
-                          <span className="font-mono" style={{ color: 'var(--accent-gold)' }}>{t.kementerian.kode}</span>
-                          <span>{t.kementerian.nama}</span>
-                        </span>
-                      ) : '—'}
-                    </td>
-                    <td className="px-5 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                      {t.program_event?.nama || t.kategori_pengeluaran?.nama || '—'}
-                    </td>
-                    <td className="px-5 py-3">
-                      <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
-                        {t.sumber}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded ${statusColor[t.status] || 'badge-lainnya'}`}>
-                        {t.status.replace('_', ' ')}
-                      </span>
-                    </td>
+                      </td>
+                    ) : (
+                      <>
+                        <td className="px-5 py-3 text-xs" style={{ color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{t.tanggal || t.created_at?.substring(0, 10) || '—'}</td>
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
+                              style={{ background: t.tipe === 'masuk' ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)' }}>
+                              {t.tipe === 'masuk'
+                                ? <TrendingUp size={11} style={{ color: '#22c55e' }} />
+                                : <TrendingDown size={11} style={{ color: '#ef4444' }} />
+                              }
+                            </div>
+                            <span className="text-sm truncate" style={{ maxWidth: 260 }}>{t.keterangan}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-3 text-right font-medium text-sm" style={{ color: t.tipe === 'masuk' ? '#22c55e' : '#ef4444', whiteSpace: 'nowrap' }}>
+                          {t.tipe === 'masuk' ? '+' : '-'}{formatRupiah(t.jumlah)}
+                        </td>
+                        <td className="px-5 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                          {t.kementerian ? (
+                            <span className="flex items-center gap-1">
+                              <span className="font-mono" style={{ color: 'var(--accent-gold)' }}>{t.kementerian.kode}</span>
+                              <span className="truncate" style={{ maxWidth: 120 }}>{t.kementerian.nama}</span>
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td className="px-5 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                          {t.program_event?.nama || t.kategori_pengeluaran?.nama || '—'}
+                        </td>
+                        <td className="px-5 py-3">
+                          <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
+                            {t.sumber}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3">
+                          <span className={`text-xs px-2 py-0.5 rounded ${statusColor[t.status] || 'badge-lainnya'}`}>
+                            {t.status.replace('_', ' ')}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3 text-right">
+                          <button
+                            onClick={() => { setEditingId(t.id); setEditForm({ keterangan: t.keterangan || '', jumlah: t.jumlah || 0 }) }}
+                            className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                            title="Edit Transaksi"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>
