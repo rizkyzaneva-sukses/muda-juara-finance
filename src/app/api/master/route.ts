@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { entity, ...body } = await req.json()
+    const { entity, kementerian, jenis_transaksi, created_at, ...body } = await req.json()
     const table = TABLES[entity]
     if (!table) return NextResponse.json({ error: 'Entity not found' }, { status: 400 })
 
@@ -66,7 +66,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
-    const { entity, id, ...updates } = await req.json()
+    const { entity, id, kementerian, jenis_transaksi, created_at, ...updates } = await req.json()
     const table = TABLES[entity]
     if (!table) return NextResponse.json({ error: 'Entity not found' }, { status: 400 })
 
