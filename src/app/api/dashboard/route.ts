@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
 
+const MDR_RATE = 0.007;
+
 export async function GET(req: NextRequest) {
   try {
     // Get rekening saldo awal
@@ -29,10 +31,12 @@ export async function GET(req: NextRequest) {
         totalMasuk += t.jumlah
         if (t.sumber === 'BCA') totalMasukBCA += t.jumlah
         if (t.sumber === 'BSI') totalMasukBSI += t.jumlah
+        if (t.sumber === 'QRIS') totalMasukBCA += (t.jumlah * (1 - MDR_RATE))
       } else {
         totalKeluar += t.jumlah
         if (t.sumber === 'BCA') totalKeluarBCA += t.jumlah
         if (t.sumber === 'BSI') totalKeluarBSI += t.jumlah
+        if (t.sumber === 'QRIS') totalKeluarBCA += t.jumlah // if any outgoing QRIS
       }
     })
 
@@ -112,14 +116,14 @@ export async function GET(req: NextRequest) {
           txn: 0, qris: 0, transfer: 0, pengeluaran: 0, sisa: 0, persen: 0
         })
       }
-      rincianMap.get(key).qris += q.amount
+      rincianMap.get(key).qris += (q.amount * (1 - MDR_RATE))
     })
 
     // Process pengeluaran
     allTrx?.filter(t => t.tipe === 'keluar').forEach(t => {
       const kemId = t.kementerian_id || 'tanpa'
       const progId = t.program_event_id || 'belum'
-      
+
       // Find matching masuk entry or create pengeluaran entry
       let found = false
       rincianMap.forEach((entry, key) => {

@@ -1,7 +1,7 @@
 'use client'
 import { useState, useRef } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
-import { formatRupiah, parseQrisCode } from '@/lib/qris'
+import { formatRupiah, parseQrisCode, MDR_RATE } from '@/lib/qris'
 import { Upload, FileText, Image, Table, Trash2, Check, AlertCircle, Loader, Camera } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
@@ -430,6 +430,16 @@ export default function UploadPage() {
                 <span className="text-xs px-2 py-1 rounded badge-valid">
                   {totalNonDuplicate} akan disimpan
                 </span>
+                {mode === 'qris' && totalNonDuplicate > 0 && (() => {
+                  const qrisAmts = preview.filter(r => !r.isDuplicate).reduce((acc, r) => acc + (r.amount || 0), 0)
+                  const qrisMdr = qrisAmts * MDR_RATE
+                  const qrisNetto = qrisAmts - qrisMdr
+                  return (
+                    <span className="text-xs px-2 py-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      Bruto: {formatRupiah(qrisAmts)} | MDR 0.7%: -{formatRupiah(qrisMdr)} | Netto ke BCA: {formatRupiah(qrisNetto)}
+                    </span>
+                  )
+                })()}
               </div>
               <div className="flex gap-2">
                 <button
@@ -550,39 +560,47 @@ export default function UploadPage() {
                             <td className="px-3 py-2 whitespace-nowrap">{row.created_date?.substring(0, 10)}</td>
                             <td className="px-3 py-2" style={{ maxWidth: 160 }}><div className="truncate">{row.merchant_name}</div></td>
                             <td className="px-3 py-2 text-right font-medium" style={{ color: '#22c55e' }}>{formatRupiah(row.amount)}</td>
-                            <td className="px-3 py-2">
-                              <select
-                                value={row.kementerian_id || ''}
-                                onChange={e => updateRow(row._idx, { kementerian_id: e.target.value ? parseInt(e.target.value) : null })}
-                                className="input-dark text-xs py-1"
-                                style={{ minWidth: 120 }}
-                              >
-                                <option value="">— Pilih —</option>
-                                {kementerian.map((k: any) => <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>)}
-                              </select>
-                            </td>
-                            <td className="px-3 py-2">
-                              <select
-                                value={row.jenis_transaksi_id || ''}
-                                onChange={e => updateRow(row._idx, { jenis_transaksi_id: e.target.value ? parseInt(e.target.value) : null })}
-                                className="input-dark text-xs py-1"
-                                style={{ minWidth: 120 }}
-                              >
-                                <option value="">— Pilih —</option>
-                                {jenisTransaksi.map((j: any) => <option key={j.id} value={j.id}>{j.kode} - {j.nama}</option>)}
-                              </select>
-                            </td>
-                            <td className="px-3 py-2">
-                              <select
-                                value={row.program_event_id || ''}
-                                onChange={e => updateRow(row._idx, { program_event_id: e.target.value ? parseInt(e.target.value) : null })}
-                                className="input-dark text-xs py-1"
-                                style={{ minWidth: 120 }}
-                              >
-                                <option value="">— Pilih Program —</option>
-                                {programEvent.map((p: any) => <option key={p.id} value={p.id}>{p.nama}</option>)}
-                              </select>
-                            </td>
+                            {row.isAutoWait ? (
+                              <td colSpan={3} className="px-3 py-2 text-center align-middle">
+                                <span className="text-[10px] text-blue-300 bg-blue-900/30 px-2 py-1 border border-blue-500/20 rounded">QRIS Settlement — Auto Valid</span>
+                              </td>
+                            ) : (
+                              <>
+                                <td className="px-3 py-2">
+                                  <select
+                                    value={row.kementerian_id || ''}
+                                    onChange={e => updateRow(row._idx, { kementerian_id: e.target.value ? parseInt(e.target.value) : null })}
+                                    className="input-dark text-xs py-1"
+                                    style={{ minWidth: 120 }}
+                                  >
+                                    <option value="">— Pilih —</option>
+                                    {kementerian.map((k: any) => <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>)}
+                                  </select>
+                                </td>
+                                <td className="px-3 py-2">
+                                  <select
+                                    value={row.jenis_transaksi_id || ''}
+                                    onChange={e => updateRow(row._idx, { jenis_transaksi_id: e.target.value ? parseInt(e.target.value) : null })}
+                                    className="input-dark text-xs py-1"
+                                    style={{ minWidth: 120 }}
+                                  >
+                                    <option value="">— Pilih —</option>
+                                    {jenisTransaksi.map((j: any) => <option key={j.id} value={j.id}>{j.kode} - {j.nama}</option>)}
+                                  </select>
+                                </td>
+                                <td className="px-3 py-2">
+                                  <select
+                                    value={row.program_event_id || ''}
+                                    onChange={e => updateRow(row._idx, { program_event_id: e.target.value ? parseInt(e.target.value) : null })}
+                                    className="input-dark text-xs py-1"
+                                    style={{ minWidth: 120 }}
+                                  >
+                                    <option value="">— Pilih Program —</option>
+                                    {programEvent.map((p: any) => <option key={p.id} value={p.id}>{p.nama}</option>)}
+                                  </select>
+                                </td>
+                              </>
+                            )}
                             <td className="px-3 py-2">
                               <span className={`badge-${row.isDuplicate ? 'cek-manual' : 'valid'} text-xs px-2 py-0.5 rounded`}>
                                 {row.isDuplicate ? 'duplikat' : row.status}
@@ -600,51 +618,59 @@ export default function UploadPage() {
                                 {row.tipe.toUpperCase()}
                               </span>
                             </td>
-                            <td className="px-3 py-2">
-                              <select
-                                value={row.kementerian_id || ''}
-                                onChange={e => updateRow(row._idx, { kementerian_id: e.target.value ? parseInt(e.target.value) : null })}
-                                className="input-dark text-xs py-1"
-                                style={{ minWidth: 120, borderColor: row.tipe === 'masuk' && !row.kementerian_id ? 'var(--accent-gold)' : '' }}
-                              >
-                                <option value="">— Pilih —</option>
-                                {kementerian.map((k: any) => <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>)}
-                              </select>
-                            </td>
-                            <td className="px-3 py-2">
-                              <div className="flex flex-col gap-1">
-                                {row.tipe === 'masuk' ? (
+                            {row.isAutoWait ? (
+                              <td colSpan={2} className="px-3 py-2 text-center align-middle">
+                                <span className="text-[10px] text-blue-300 bg-blue-900/30 px-2 py-1 border border-blue-500/20 rounded">QRIS Settlement — Auto Valid</span>
+                              </td>
+                            ) : (
+                              <>
+                                <td className="px-3 py-2">
                                   <select
-                                    value={row.jenis_transaksi_id || ''}
-                                    onChange={e => updateRow(row._idx, { jenis_transaksi_id: e.target.value ? parseInt(e.target.value) : null })}
+                                    value={row.kementerian_id || ''}
+                                    onChange={e => updateRow(row._idx, { kementerian_id: e.target.value ? parseInt(e.target.value) : null })}
                                     className="input-dark text-xs py-1"
-                                    style={{ minWidth: 130 }}
+                                    style={{ minWidth: 120, borderColor: row.tipe === 'masuk' && !row.kementerian_id ? 'var(--accent-gold)' : '' }}
                                   >
-                                    <option value="">— Jenis Trx —</option>
-                                    {jenisTransaksi.map((j: any) => <option key={j.id} value={j.id}>{j.kode} - {j.nama}</option>)}
+                                    <option value="">— Pilih —</option>
+                                    {kementerian.map((k: any) => <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>)}
                                   </select>
-                                ) : (
-                                  <select
-                                    value={row.kategori_pengeluaran_id || ''}
-                                    onChange={e => updateRow(row._idx, { kategori_pengeluaran_id: e.target.value ? parseInt(e.target.value) : null })}
-                                    className="input-dark text-xs py-1"
-                                    style={{ minWidth: 130 }}
-                                  >
-                                    <option value="">— Kat. Keluar —</option>
-                                    {kategoriPengeluaran.map((k: any) => <option key={k.id} value={k.id}>{k.nama}</option>)}
-                                  </select>
-                                )}
-                                <select
-                                  value={row.program_event_id || ''}
-                                  onChange={e => updateRow(row._idx, { program_event_id: e.target.value ? parseInt(e.target.value) : null })}
-                                  className="input-dark text-[10px] py-0.5 mt-1"
-                                  style={{ minWidth: 130, opacity: 0.8 }}
-                                >
-                                  <option value="">— + Program —</option>
-                                  {programEvent.map((p: any) => <option key={p.id} value={p.id}>{p.nama}</option>)}
-                                </select>
-                              </div>
-                            </td>
+                                </td>
+                                <td className="px-3 py-2">
+                                  <div className="flex flex-col gap-1">
+                                    {row.tipe === 'masuk' ? (
+                                      <select
+                                        value={row.jenis_transaksi_id || ''}
+                                        onChange={e => updateRow(row._idx, { jenis_transaksi_id: e.target.value ? parseInt(e.target.value) : null })}
+                                        className="input-dark text-xs py-1"
+                                        style={{ minWidth: 130 }}
+                                      >
+                                        <option value="">— Jenis Trx —</option>
+                                        {jenisTransaksi.map((j: any) => <option key={j.id} value={j.id}>{j.kode} - {j.nama}</option>)}
+                                      </select>
+                                    ) : (
+                                      <select
+                                        value={row.kategori_pengeluaran_id || ''}
+                                        onChange={e => updateRow(row._idx, { kategori_pengeluaran_id: e.target.value ? parseInt(e.target.value) : null })}
+                                        className="input-dark text-xs py-1"
+                                        style={{ minWidth: 130 }}
+                                      >
+                                        <option value="">— Kat. Keluar —</option>
+                                        {kategoriPengeluaran.map((k: any) => <option key={k.id} value={k.id}>{k.nama}</option>)}
+                                      </select>
+                                    )}
+                                    <select
+                                      value={row.program_event_id || ''}
+                                      onChange={e => updateRow(row._idx, { program_event_id: e.target.value ? parseInt(e.target.value) : null })}
+                                      className="input-dark text-[10px] py-0.5 mt-1"
+                                      style={{ minWidth: 130, opacity: 0.8 }}
+                                    >
+                                      <option value="">— + Program —</option>
+                                      {programEvent.map((p: any) => <option key={p.id} value={p.id}>{p.nama}</option>)}
+                                    </select>
+                                  </div>
+                                </td>
+                              </>
+                            )}
                             <td className="px-3 py-2 text-center">
                               <span className={`badge-${row.isDuplicate ? 'cek-manual' : row.status === 'valid' ? 'valid' : 'cek-manual'} text-[10px] px-1.5 py-0.5 rounded`}>
                                 {row.isDuplicate ? 'duplikat' : row.status}

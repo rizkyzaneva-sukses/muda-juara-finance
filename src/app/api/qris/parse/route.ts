@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAdminRequest } from '@/lib/auth'
-import { parseQrisCode } from '@/lib/qris'
+import { parseQrisCode, isAutoSkipMybb } from '@/lib/qris'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export async function POST(req: NextRequest) {
@@ -31,15 +31,26 @@ export async function POST(req: NextRequest) {
       const amount = parseInt(row.AMOUNT || row.amount || 0)
       const tid = row.TID || row.tid || ''
       const isDuplicate = existingSet.has(`${tid}-${amount}`)
+      const merchant_name = row.MERCHANT_NAME || row.merchant_name || ''
+      const isAutoWait = isAutoSkipMybb(merchant_name)
 
-      const code = parseQrisCode(amount)
-      const kem = code.status === 'valid' ? kemMap.get(code.ministryCode) : null
-      const jenis = code.status === 'valid' ? jenisMap.get(code.transactionCode) : null
+      let kem = null
+      let jenis = null
+      let status = isAutoWait ? 'valid' : 'cek_manual'
+
+      if (!isAutoWait) {
+        const code = parseQrisCode(amount)
+        if (code.status === 'valid') {
+          kem = kemMap.get(code.ministryCode) || null
+          jenis = jenisMap.get(code.transactionCode) || null
+          status = 'pending'
+        }
+      }
 
       return {
         _idx: idx,
         created_date: row.CREATED_DATE || row.created_date,
-        merchant_name: row.MERCHANT_NAME || row.merchant_name || '',
+        merchant_name,
         merchant_id: row.MERCHANT_ID || row.merchant_id || '',
         tid,
         amount,
@@ -48,8 +59,9 @@ export async function POST(req: NextRequest) {
         kementerian_nama: kem?.nama || null,
         jenis_transaksi_id: jenis?.id || null,
         jenis_nama: jenis?.nama || null,
-        status: code.status === 'valid' ? 'pending' : 'cek_manual',
+        status,
         isDuplicate,
+        isAutoWait
       }
     })
 

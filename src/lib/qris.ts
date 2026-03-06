@@ -1,7 +1,9 @@
 import { QrisCode } from '@/types'
 
-const VALID_MINISTRY_CODES = ['01','02','03','04','05','06','07','08','09']
-const VALID_TRANSACTION_CODES = ['10','11','12','13','15','16','17','96','97']
+export const MDR_RATE = 0.007;
+
+const VALID_MINISTRY_CODES = ['01', '02', '03', '04', '05', '06', '07', '08', '09']
+const VALID_TRANSACTION_CODES = ['10', '11', '12', '13', '15', '16', '17', '96', '97']
 
 export function parseQrisCode(amount: number): QrisCode {
   const lastThree = amount % 1000
@@ -22,9 +24,13 @@ export function parseQrisCode(amount: number): QrisCode {
 }
 
 export function isTrfBatchMybb(keterangan: string): boolean {
-  return keterangan?.toUpperCase().includes('TRF BATCH MYBB') || 
-         keterangan?.toUpperCase().includes('PEMBAYARAN MERCHANT') ||
-         keterangan?.toUpperCase().includes('PEMBAYARAN TRX')
+  return keterangan?.toUpperCase().includes('TRF BATCH MYBB') ||
+    keterangan?.toUpperCase().includes('PEMBAYARAN MERCHANT') ||
+    keterangan?.toUpperCase().includes('PEMBAYARAN TRX')
+}
+
+export function isAutoSkipMybb(teks: string): boolean {
+  return teks?.toUpperCase().includes('TRF BATCH MYBB') || false;
 }
 
 export function formatRupiah(amount: number): string {

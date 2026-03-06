@@ -160,6 +160,9 @@ export default function DashboardPage() {
             <div className="text-2xl font-bold" style={{ fontFamily: 'Syne, sans-serif', color: 'var(--accent-blue)' }}>
               {formatRupiah(stats?.saldo_bca || 0)}
             </div>
+            <div className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+              Termasuk QRIS netto (potong MDR 0.7%)
+            </div>
           </div>
           <div className="card p-5" style={{ border: '1px solid rgba(240,165,0,0.2)', background: 'rgba(240,165,0,0.05)' }}>
             <div className="flex items-center justify-between mb-3">
@@ -357,6 +360,8 @@ export default function DashboardPage() {
           <div className="px-5 py-3 text-xs border-t" style={{ borderColor: 'var(--bg-border)', color: 'var(--text-secondary)' }}>
             Sisa = <span style={{ color: '#eab308' }}>{formatRupiah(totalSisa)}</span>
             {' '}(Total Masuk {formatRupiah(rincian.reduce((s, r) => s + r.qris + r.transfer, 0))} — Pengeluaran {formatRupiah(rincian.reduce((s, r) => s + r.pengeluaran, 0))})
+            <br />
+            <span style={{ color: 'var(--text-muted)' }}>* Nominal QRIS sudah dipotong MDR 0.7%</span>
           </div>
         </div>
 

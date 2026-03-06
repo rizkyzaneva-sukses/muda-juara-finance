@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase'
+import { MDR_RATE } from '@/lib/qris'
 
 export async function GET(req: NextRequest) {
     try {
@@ -45,11 +46,14 @@ export async function GET(req: NextRequest) {
                     count_keluar: 0,
                 }
             }
+
+            const actualJumlah = t.sumber === 'QRIS' ? t.jumlah * (1 - MDR_RATE) : t.jumlah
+
             if (t.tipe === 'masuk') {
-                byKem[kemKey].total_masuk += t.jumlah
+                byKem[kemKey].total_masuk += actualJumlah
                 byKem[kemKey].count_masuk++
             } else {
-                byKem[kemKey].total_keluar += t.jumlah
+                byKem[kemKey].total_keluar += actualJumlah
                 byKem[kemKey].count_keluar++
             }
         })
@@ -59,15 +63,24 @@ export async function GET(req: NextRequest) {
         transaksi?.forEach(t => {
             const month = t.tanggal?.substring(0, 7) // YYYY-MM
             if (!month) return
+
+            const actualJumlah = t.sumber === 'QRIS' ? t.jumlah * (1 - MDR_RATE) : t.jumlah
+
             if (!byMonth[month]) byMonth[month] = { month, total_masuk: 0, total_keluar: 0, count: 0 }
-            if (t.tipe === 'masuk') byMonth[month].total_masuk += t.jumlah
-            else byMonth[month].total_keluar += t.jumlah
+            if (t.tipe === 'masuk') byMonth[month].total_masuk += actualJumlah
+            else byMonth[month].total_keluar += actualJumlah
             byMonth[month].count++
         })
 
         // Totals
-        const totalMasuk = transaksi?.filter(t => t.tipe === 'masuk').reduce((s, t) => s + t.jumlah, 0) || 0
-        const totalKeluar = transaksi?.filter(t => t.tipe === 'keluar').reduce((s, t) => s + t.jumlah, 0) || 0
+        const totalMasuk = transaksi?.filter(t => t.tipe === 'masuk').reduce((s, t) => {
+            const act = t.sumber === 'QRIS' ? t.jumlah * (1 - MDR_RATE) : t.jumlah;
+            return s + act;
+        }, 0) || 0
+        const totalKeluar = transaksi?.filter(t => t.tipe === 'keluar').reduce((s, t) => {
+            const act = t.sumber === 'QRIS' ? t.jumlah * (1 - MDR_RATE) : t.jumlah;
+            return s + act;
+        }, 0) || 0
 
         return NextResponse.json({
             transaksi,
