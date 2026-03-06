@@ -11,33 +11,35 @@
     "db:seed": "node --experimental-vm-modules scripts/import-csv.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "bcryptjs": "^2.4.3",
+    "clsx": "^2.1.1",
+    "date-fns": "^3.6.0",
+    "dotenv": "^17.3.1",
+    "jsonwebtoken": "^9.0.2",
+    "lucide-react": "^0.441.0",
     "next": "14.2.5",
+    "openai": "^4.57.0",
+    "pdf-parse": "^1.1.1",
     "react": "^18",
     "react-dom": "^18",
-    "@supabase/supabase-js": "^2.45.0",
-    "openai": "^4.57.0",
-    "jsonwebtoken": "^9.0.2",
-    "bcryptjs": "^2.4.3",
-    "xlsx": "^0.18.5",
-    "date-fns": "^3.6.0",
     "recharts": "^2.12.7",
-    "lucide-react": "^0.441.0",
-    "clsx": "^2.1.1",
     "tailwind-merge": "^2.5.2",
-    "pdf-parse": "^1.1.1"
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "typescript": "^5",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/dotenv": "^6.1.1",
+    "@types/jsonwebtoken": "^9.0.6",
     "@types/node": "^20",
+    "@types/pdf-parse": "^1.1.4",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "@types/jsonwebtoken": "^9.0.6",
-    "@types/bcryptjs": "^2.4.6",
-    "@types/pdf-parse": "^1.1.4",
-    "tailwindcss": "^3.4.1",
-    "postcss": "^8",
     "autoprefixer": "^10.0.1",
     "eslint": "^8",
-    "eslint-config-next": "14.2.5"
+    "eslint-config-next": "14.2.5",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5"
   }
 }
