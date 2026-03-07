@@ -5,7 +5,7 @@ import { formatRupiah, parseQrisCode, MDR_RATE } from '@/lib/qris'
 import { Upload, FileText, Image, Table, Trash2, Check, AlertCircle, Loader, Camera, Download, FileSpreadsheet } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
-type UploadMode = 'qris' | 'mutasi-pdf' | 'mutasi-image' | 'mutasi-csv'
+type UploadMode = 'qris' | 'qris-csv' | 'mutasi-pdf' | 'mutasi-image' | 'mutasi-csv'
 
 const BANK_OPTIONS = ['BCA', 'BSI'] as const
 type BankType = typeof BANK_OPTIONS[number]
@@ -81,6 +81,96 @@ export default function UploadPage() {
       showToast('Gagal parsing QRIS: ' + e.message, 'error')
     }
     setLoading(false)
+  }
+
+  // ─── QRIS CSV (dengan mapping) ─────────────────────────────────────────────
+  const handleQrisCSV = async (file: File) => {
+    await loadMasterData()
+    setLoading(true)
+    try {
+      const text = await file.text()
+      const parseCSVLine = (line: string): string[] => {
+        const result: string[] = []
+        let current = ''
+        let inQuotes = false
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i]
+          if (ch === '"') {
+            if (inQuotes && line[i + 1] === '"') { current += '"'; i++ }
+            else inQuotes = !inQuotes
+          } else if (ch === ',' && !inQuotes) {
+            result.push(current.trim()); current = ''
+          } else { current += ch }
+        }
+        result.push(current.trim())
+        return result
+      }
+      const cleanText = text.replace(/^\uFEFF/, '')
+      const allLines = cleanText.split(/\r?\n/).filter(l => l.trim() && !l.trim().startsWith('#'))
+      if (allLines.length < 2) throw new Error('File CSV kosong atau tidak valid')
+      const headers = parseCSVLine(allLines[0]).map(h => h.toLowerCase().trim())
+      const rows = allLines.slice(1).map(line => {
+        const vals = parseCSVLine(line)
+        const obj: any = {}
+        headers.forEach((h, i) => { obj[h] = vals[i] || '' })
+        return obj
+      }).filter(r => r.amount || r.tid || r.created_date || r.tanggal)
+
+      const token = localStorage.getItem('admin_token')
+      const res = await fetch('/api/qris/csv-parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ rows }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setPreview(data.preview || [])
+    } catch (e: any) {
+      showToast('Gagal parsing CSV QRIS: ' + e.message, 'error')
+    }
+    setLoading(false)
+  }
+
+  const downloadQrisTemplate = async () => {
+    let masterInfo = ''
+    try {
+      const res = await fetch('/api/qris/csv-parse')
+      const master = await res.json()
+      const kemList = (master.kementerian || []).map((k: any) => k.nama).join(' | ')
+      const jenisList = (master.jenis_transaksi || []).map((j: any) => j.nama).join(' | ')
+      const programList = (master.program_event || []).map((p: any) => p.nama).join(' | ')
+      masterInfo = [
+        '',
+        '# ================================================================',
+        '# PANDUAN REFERENSI - Salin nama persis untuk kolom terkait',
+        '# ================================================================',
+        '# KOLOM kementerian:', `# ${kemList}`,
+        '# KOLOM jenis_transaksi:', `# ${jenisList}`,
+        '# KOLOM program_event (opsional):', `# ${programList}`,
+        '# KOLOM tanggal: format YYYY-MM-DD contoh: 2026-03-07',
+        '# KOLOM amount: nominal QRIS (angka bulat)',
+        '# KOLOM tid: Transaction ID dari sistem QRIS',
+      ].join('\n')
+    } catch (_) { }
+
+    const headers = ['created_date', 'merchant_name', 'merchant_id', 'tid', 'amount', 'transaction_type', 'kementerian', 'jenis_transaksi', 'program_event']
+    const examples = [
+      ['2026-03-01', 'Toko Berkah', 'MID001', 'TID-001', '500117', 'QRIS', 'Kementerian SDM', 'Transfer BI-Fast', 'Baksos'],
+      ['2026-03-02', 'Warung Maju', 'MID002', 'TID-002', '1000297', 'QRIS', 'Keuangan', 'Transfer BI-Fast', 'UMROH MJ'],
+      ['2026-03-03', 'Toko Amanah', 'MID003', 'TID-003', '250510', 'QRIS', '', '', ''],
+    ]
+    const csv = [
+      headers.join(','),
+      ...examples.map(r => r.map(v => v.includes(',') ? `"${v}"` : v).join(',')),
+      masterInfo
+    ].join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'template_qris_mapping.csv'
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   // Add an image compressor to avoid limits
@@ -284,6 +374,7 @@ export default function UploadPage() {
     if (!file) return
     setPreview([])
     if (mode === 'qris') handleQrisFile(file)
+    else if (mode === 'qris-csv') handleQrisCSV(file)
     else if (mode === 'mutasi-csv') handleMutasiCSV(file)
     else handleMutasiFile(file)
   }
@@ -295,6 +386,7 @@ export default function UploadPage() {
     if (!file) return
     setPreview([])
     if (mode === 'qris') handleQrisFile(file)
+    else if (mode === 'qris-csv') handleQrisCSV(file)
     else if (mode === 'mutasi-csv') handleMutasiCSV(file)
     else handleMutasiFile(file)
   }
@@ -378,10 +470,12 @@ export default function UploadPage() {
   const totalDuplicate = preview.filter(r => r.isDuplicate).length
   const isMutasi = mode === 'mutasi-pdf' || mode === 'mutasi-image'
   const isMutasiCSV = mode === 'mutasi-csv'
+  const isQrisCSV = mode === 'qris-csv'
 
   // ─── Accept types ─────────────────────────────────────────────────────────
   const acceptMap: Record<UploadMode, string> = {
     'qris': '.xlsx,.xls',
+    'qris-csv': '.csv',
     'mutasi-pdf': '.pdf',
     'mutasi-image': '.jpg,.jpeg,.png,.webp',
     'mutasi-csv': '.csv',
@@ -391,10 +485,17 @@ export default function UploadPage() {
   const modes: { id: UploadMode; label: string; icon: any; desc: string; color: string }[] = [
     {
       id: 'qris',
-      label: 'Upload QRIS',
+      label: 'Upload QRIS (XLSX)',
       icon: Table,
       desc: 'File .xlsx dari DSP QRIS export',
       color: '#22c55e',
+    },
+    {
+      id: 'qris-csv',
+      label: 'QRIS CSV + Mapping',
+      icon: FileSpreadsheet,
+      desc: 'CSV QRIS lengkap dengan kementerian & jenis',
+      color: '#10b981',
     },
     {
       id: 'mutasi-csv',
@@ -431,20 +532,20 @@ export default function UploadPage() {
               Upload QRIS, mutasi bank PDF, screenshot, atau CSV manual
             </p>
           </div>
-          {isMutasiCSV && (
+          {(isMutasiCSV || isQrisCSV) && (
             <button
-              onClick={downloadTemplate}
+              onClick={isQrisCSV ? downloadQrisTemplate : downloadTemplate}
               className="btn-secondary flex items-center gap-2 text-xs"
-              title="Download template CSV kosong"
+              title="Download template CSV"
             >
               <Download size={14} />
-              Download Template CSV
+              {isQrisCSV ? 'Download Template QRIS CSV' : 'Download Template CSV'}
             </button>
           )}
         </div>
 
         {/* Mode tabs */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {modes.map(m => {
             const Icon = m.icon
             const active = mode === m.id
@@ -539,6 +640,7 @@ export default function UploadPage() {
                   {mode === 'mutasi-pdf' && 'Memproses PDF dengan GPT-4o...'}
                   {mode === 'mutasi-image' && 'Membaca screenshot dengan AI Vision...'}
                   {mode === 'qris' && 'Memproses file QRIS...'}
+                  {mode === 'qris-csv' && 'Memproses CSV QRIS...'}
                   {mode === 'mutasi-csv' && 'Memproses file CSV...'}
                 </p>
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -554,6 +656,7 @@ export default function UploadPage() {
                 <p className="font-semibold text-base mb-1">Klik atau drag & drop file di sini</p>
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                   {mode === 'qris' && 'Format: .xlsx (DSP QRIS Export)'}
+                  {mode === 'qris-csv' && 'Format: .csv sesuai template QRIS (created_date, tid, amount, merchant_name, kementerian, jenis_transaksi)'}
                   {mode === 'mutasi-pdf' && `Format: PDF mutasi ${bank} Syariah`}
                   {mode === 'mutasi-image' && `Format: JPG/PNG screenshot mutasi ${bank}`}
                   {mode === 'mutasi-csv' && 'Format: .csv sesuai template (tanggal, keterangan, debit, kredit, sumber)'}
@@ -562,6 +665,15 @@ export default function UploadPage() {
                   <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
                     Diproses otomatis oleh AI — tidak perlu format khusus
                   </p>
+                )}
+                {isQrisCSV && (
+                  <button
+                    onClick={e => { e.stopPropagation(); downloadQrisTemplate() }}
+                    className="mt-3 flex items-center gap-1.5 mx-auto text-xs px-3 py-1.5 rounded-lg"
+                    style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)' }}
+                  >
+                    <Download size={13} /> Download Template QRIS CSV
+                  </button>
                 )}
                 {isMutasiCSV && (
                   <button
@@ -617,14 +729,14 @@ export default function UploadPage() {
                   Batal
                 </button>
                 <button
-                  onClick={mode === 'qris' ? saveQris : saveMutasi}
+                  onClick={(mode === 'qris' || mode === 'qris-csv') ? saveQris : saveMutasi}
                   disabled={saving || totalNonDuplicate === 0}
                   className="btn-primary flex items-center gap-2"
                 >
                   {saving ? <div className="spinner" style={{ width: 16, height: 16 }} /> : <Check size={14} />}
                   Simpan {totalNonDuplicate} Data
                 </button>
-                {/* mutasi-csv juga menggunakan saveMutasi karena format preview-nya sama */}
+                {/* qris-csv & mutasi-csv menggunakan save function yang sama dengan format aslinya */}
               </div>
             </div>
 
