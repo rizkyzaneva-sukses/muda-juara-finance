@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyAdminPassword, generateToken } from '@/lib/auth'
+import { verifyAdminPassword, verifyViewerPassword, generateToken } from '@/lib/auth'
 
 export async function POST(req: NextRequest) {
   const { password } = await req.json()
-  
-  if (!verifyAdminPassword(password)) {
-    return NextResponse.json({ error: 'Password salah' }, { status: 401 })
+
+  if (verifyAdminPassword(password)) {
+    const token = generateToken({ role: 'admin', ts: Date.now() })
+    return NextResponse.json({ token, role: 'admin' })
   }
 
-  const token = generateToken({ role: 'admin', ts: Date.now() })
-  return NextResponse.json({ token })
+  if (verifyViewerPassword(password)) {
+    const token = generateToken({ role: 'kementerian', ts: Date.now() })
+    return NextResponse.json({ token, role: 'kementerian' })
+  }
+
+  return NextResponse.json({ error: 'Password salah' }, { status: 401 })
 }

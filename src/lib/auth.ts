@@ -3,9 +3,14 @@ import { NextRequest } from 'next/server'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'mudajuara_secret'
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'mudajuara2026'
+const KEMENTERIAN_PASSWORD = process.env.KEMENTERIAN_PASSWORD || 'kementerian2026'
 
 export function verifyAdminPassword(password: string): boolean {
   return password === ADMIN_PASSWORD
+}
+
+export function verifyViewerPassword(password: string): boolean {
+  return password === KEMENTERIAN_PASSWORD
 }
 
 export function generateToken(payload: object): string {

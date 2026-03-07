@@ -31,7 +31,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const token = localStorage.getItem('admin_token')
-    if (token) setIsAdmin(true)
+    const role = localStorage.getItem('user_role')
+    if (token) {
+      if (role === 'kementerian') setIsAdmin(false)
+      else setIsAdmin(true)
+    }
   }, [])
 
   const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
@@ -49,11 +53,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       const data = await res.json()
       if (data.token) {
         localStorage.setItem('admin_token', data.token)
-        setIsAdmin(true)
+        localStorage.setItem('user_role', data.role)
+        if (data.role === 'admin') {
+          setIsAdmin(true)
+          showToast('Login berhasil! Selamat datang Admin.')
+        } else {
+          setIsAdmin(false)
+          showToast('Login berhasil! Selamat memantau, Kementerian.')
+        }
         setShowLoginModal(false)
         setPassword('')
         setLoginError('')
-        showToast('Login berhasil! Selamat datang Admin.')
+        // Refresh page so other components know the role
+        window.location.reload()
       } else {
         setLoginError('Password salah')
       }
@@ -64,8 +76,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const handleLogout = () => {
     localStorage.removeItem('admin_token')
+    localStorage.removeItem('user_role')
     setIsAdmin(false)
     showToast('Logout berhasil', 'success')
+    window.location.reload()
   }
 
   const visibleNav = navItems.filter(item => item.public || isAdmin)
@@ -128,18 +142,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Auth button */}
         <div className="p-3 border-t" style={{ borderColor: 'var(--bg-border)' }}>
-          {isAdmin ? (
-            <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all"
-              style={{ color: 'var(--text-secondary)', border: '1px solid var(--bg-border)' }}>
-              <Unlock size={16} />
-              <span>Logout Admin</span>
-            </button>
-          ) : (
-            <button onClick={() => setShowLoginModal(true)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all btn-primary">
-              <Lock size={16} />
-              <span>Admin Login</span>
-            </button>
-          )}
+          {(() => {
+            const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
+            if (token) {
+              return (
+                <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all"
+                  style={{ color: 'var(--text-secondary)', border: '1px solid var(--bg-border)' }}>
+                  <Unlock size={16} />
+                  <span>Logout</span>
+                </button>
+              );
+            }
+            return (
+              <button onClick={() => setShowLoginModal(true)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all btn-primary">
+                <Lock size={16} />
+                <span>Admin Login</span>
+              </button>
+            );
+          })()}
         </div>
       </aside>
 
@@ -154,16 +174,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <span className="font-bold text-sm" style={{ fontFamily: 'Syne, sans-serif', color: 'var(--accent-gold)' }}>
             MUDA JUARA
           </span>
-          {!isAdmin && (
-            <button onClick={() => setShowLoginModal(true)}>
-              <Lock size={18} style={{ color: 'var(--text-secondary)' }} />
-            </button>
-          )}
-          {isAdmin && (
-            <button onClick={handleLogout}>
-              <Unlock size={18} style={{ color: 'var(--accent-gold)' }} />
-            </button>
-          )}
+          {(() => {
+            const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
+            if (!token) {
+              return (
+                <button onClick={() => setShowLoginModal(true)}>
+                  <Lock size={18} style={{ color: 'var(--text-secondary)' }} />
+                </button>
+              );
+            } else {
+              return (
+                <button onClick={handleLogout}>
+                  <Unlock size={18} style={{ color: 'var(--accent-gold)' }} />
+                </button>
+              );
+            }
+          })()}
         </header>
 
         <main className="flex-1 p-4 lg:p-6 animate-in">
@@ -177,8 +203,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="card p-6 w-full max-w-sm mx-4 animate-in">
             <div className="flex items-center justify-between mb-5">
               <div>
-                <h2 className="font-bold text-lg" style={{ fontFamily: 'Syne, sans-serif' }}>Admin Login</h2>
-                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>Masukkan password admin</p>
+                <h2 className="font-bold text-lg" style={{ fontFamily: 'Syne, sans-serif' }}>Login Aplikasi</h2>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>Masukkan password Anda</p>
               </div>
               <button onClick={() => setShowLoginModal(false)}>
                 <X size={18} style={{ color: 'var(--text-secondary)' }} />

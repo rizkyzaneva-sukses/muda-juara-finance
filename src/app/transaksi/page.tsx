@@ -28,10 +28,13 @@ export default function TransaksiPage() {
   const [bulkKategori, setBulkKategori] = useState<string>('')
   const [bulkSaving, setBulkSaving] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isKementerian, setIsKementerian] = useState(false)
 
   useEffect(() => {
     const token = localStorage.getItem('admin_token')
+    const role = localStorage.getItem('user_role')
     if (token) {
+      if (role === 'kementerian') setIsKementerian(true)
       setIsAdmin(true)
       fetchData()
     } else {
@@ -337,7 +340,7 @@ export default function TransaksiPage() {
 
         {/* Table */}
         <div className="card overflow-hidden">
-          {selectedIds.length > 0 && (
+          {!isKementerian && selectedIds.length > 0 && (
             <div className="px-5 py-3 border-b flex flex-wrap gap-4 items-center justify-between" style={{ background: 'rgba(59,130,246,0.05)', borderColor: 'var(--bg-border)' }}>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-500/20 text-blue-400">
@@ -390,14 +393,16 @@ export default function TransaksiPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--bg-border)', background: 'rgba(255,255,255,0.02)' }}>
-                  <th className="px-5 py-3 w-[40px] text-center border-r" style={{ borderColor: 'var(--bg-border)' }}>
-                    <input
-                      type="checkbox"
-                      className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500/50"
-                      checked={data.length > 0 && selectedIds.length === data.length}
-                      onChange={toggleSelectAll}
-                    />
-                  </th>
+                  {!isKementerian && (
+                    <th className="px-5 py-3 w-[40px] text-center border-r" style={{ borderColor: 'var(--bg-border)' }}>
+                      <input
+                        type="checkbox"
+                        className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500/50"
+                        checked={data.length > 0 && selectedIds.length === data.length}
+                        onChange={toggleSelectAll}
+                      />
+                    </th>
+                  )}
                   <th className="text-left px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Tanggal</th>
                   <th className="text-left px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Keterangan</th>
                   <th className="text-right px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Jumlah</th>
@@ -406,24 +411,26 @@ export default function TransaksiPage() {
                   <th className="text-left px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Program</th>
                   <th className="text-left px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Sumber</th>
                   <th className="text-left px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Status</th>
-                  <th className="text-right px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Aksi</th>
+                  {!isKementerian && <th className="text-right px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Aksi</th>}
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={10} className="text-center py-12"><div className="spinner mx-auto" /></td></tr>
+                  <tr><td colSpan={isKementerian ? 8 : 10} className="text-center py-12"><div className="spinner mx-auto" /></td></tr>
                 ) : data.length === 0 ? (
-                  <tr><td colSpan={10} className="text-center py-12 text-sm" style={{ color: 'var(--text-secondary)' }}>Tidak ada data</td></tr>
+                  <tr><td colSpan={isKementerian ? 8 : 10} className="text-center py-12 text-sm" style={{ color: 'var(--text-secondary)' }}>Tidak ada data</td></tr>
                 ) : data.map(t => (
                   <tr key={t.id} className="table-row-hover" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                    <td className="px-5 py-3 text-center border-r" style={{ borderColor: 'var(--bg-border)' }}>
-                      <input
-                        type="checkbox"
-                        className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500/50"
-                        checked={selectedIds.includes(t.id)}
-                        onChange={() => toggleSelect(t.id)}
-                      />
-                    </td>
+                    {!isKementerian && (
+                      <td className="px-5 py-3 text-center border-r" style={{ borderColor: 'var(--bg-border)' }}>
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500/50"
+                          checked={selectedIds.includes(t.id)}
+                          onChange={() => toggleSelect(t.id)}
+                        />
+                      </td>
+                    )}
                     {editingId === t.id ? (
                       <td colSpan={9} className="px-5 py-3">
                         <div className="flex items-center gap-3">
@@ -490,15 +497,17 @@ export default function TransaksiPage() {
                             {t.status.replace('_', ' ')}
                           </span>
                         </td>
-                        <td className="px-5 py-3 text-right">
-                          <button
-                            onClick={() => { setEditingId(t.id); setEditForm({ keterangan: t.keterangan || '', jumlah: t.jumlah || 0 }) }}
-                            className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
-                            title="Edit Transaksi"
-                          >
-                            <Edit2 size={14} />
-                          </button>
-                        </td>
+                        {!isKementerian && (
+                          <td className="px-5 py-3 text-right">
+                            <button
+                              onClick={() => { setEditingId(t.id); setEditForm({ keterangan: t.keterangan || '', jumlah: t.jumlah || 0 }) }}
+                              className="p-1.5 rounded hover:bg-white/10 text-gray-400 hover:text-white transition-colors"
+                              title="Edit Transaksi"
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                          </td>
+                        )}
                       </>
                     )}
                   </tr>
