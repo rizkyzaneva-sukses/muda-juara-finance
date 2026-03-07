@@ -143,13 +143,13 @@ export default function KoreksiPage() {
             </select>
             {Array.from(selected).some(id => transaksi.find(t => t.id === id)?.tipe === 'masuk') && (
               <select value={bulkJenis} onChange={e => setBulkJenis(e.target.value)} className="input-dark text-xs" style={{ width: 160 }}>
-                <option value="">Jenis (Masuk)</option>
+                <option value="">Jenis Transaksi (Masuk)</option>
                 {jenisTransaksi.map(j => <option key={j.id} value={j.id}>{j.kode} - {j.nama}</option>)}
               </select>
             )}
             {Array.from(selected).some(id => transaksi.find(t => t.id === id)?.tipe === 'keluar') && (
               <select value={bulkKat} onChange={e => setBulkKat(e.target.value)} className="input-dark text-xs" style={{ width: 180 }}>
-                <option value="">Kategori (Keluar)</option>
+                <option value="">Jenis Transaksi (Keluar)</option>
                 {kategoriPengeluaran.map(k => <option key={k.id} value={k.id}>{k.nama}</option>)}
               </select>
             )}
@@ -252,7 +252,7 @@ export default function KoreksiPage() {
                         className="input-dark text-xs"
                         style={{ width: 200 }}
                       >
-                        <option value="">Kategori Pengeluaran</option>
+                        <option value="">Jenis Transaksi</option>
                         {kategoriPengeluaran.map(k => <option key={k.id} value={k.id}>{k.nama}</option>)}
                       </select>
                     )}

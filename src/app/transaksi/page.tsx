@@ -253,7 +253,7 @@ export default function TransaksiPage() {
                   if (isAllSelectedKeluar) {
                     return (
                       <select className="input-dark text-xs py-1" style={{ width: 140 }} value={bulkKategori} onChange={e => setBulkKategori(e.target.value)}>
-                        <option value="">— Pengeluaran —</option>
+                        <option value="">— Jenis Transaksi —</option>
                         {kategoriPengeluaran.map((kp: any) => <option key={kp.id} value={kp.id}>{kp.nama}</option>)}
                       </select>
                     );
