@@ -180,28 +180,42 @@ export async function GET(req: NextRequest) {
         })
 
         // Summary by Jenis Transaksi
+        // Summary by Jenis Transaksi (Biasanya untuk Pemasukan)
         const byJenis: Record<string, any> = {}
-        transaksi?.forEach(t => {
-            const jenisKey = t.jenis_transaksi_id?.toString() || 'tanpa'
-            if (!byJenis[jenisKey]) {
-                byJenis[jenisKey] = {
-                    jenis_id: t.jenis_transaksi_id,
-                    jenis_nama: t.jenis_transaksi?.nama || 'Tanpa Jenis',
-                    total_masuk: 0,
-                    total_keluar: 0,
-                    count_masuk: 0,
-                    count_keluar: 0,
-                }
-            }
+        // Summary by Kategori Pengeluaran (Khusus Pengeluaran)
+        const byKategori: Record<string, any> = {}
 
+        transaksi?.forEach(t => {
             const actualJumlah = t.sumber === 'QRIS' ? t.jumlah * (1 - MDR_RATE) : t.jumlah
 
             if (t.tipe === 'masuk') {
+                const jenisKey = t.jenis_transaksi_id?.toString() || 'tanpa'
+                if (!byJenis[jenisKey]) {
+                    byJenis[jenisKey] = {
+                        jenis_id: t.jenis_transaksi_id,
+                        jenis_nama: t.jenis_transaksi?.nama || 'Tanpa Jenis',
+                        total_masuk: 0,
+                        total_keluar: 0,
+                        count_masuk: 0,
+                        count_keluar: 0,
+                    }
+                }
                 byJenis[jenisKey].total_masuk += actualJumlah
                 byJenis[jenisKey].count_masuk++
             } else {
-                byJenis[jenisKey].total_keluar += actualJumlah
-                byJenis[jenisKey].count_keluar++
+                const katKey = t.kategori_pengeluaran_id?.toString() || 'tanpa'
+                if (!byKategori[katKey]) {
+                    byKategori[katKey] = {
+                        kategori_id: t.kategori_pengeluaran_id,
+                        kategori_nama: t.kategori_pengeluaran?.nama || 'Tanpa Kategori',
+                        total_masuk: 0,
+                        total_keluar: 0,
+                        count_masuk: 0,
+                        count_keluar: 0,
+                    }
+                }
+                byKategori[katKey].total_keluar += actualJumlah
+                byKategori[katKey].count_keluar++
             }
         })
 
@@ -227,6 +241,7 @@ export async function GET(req: NextRequest) {
             by_kementerian: Object.values(byKem).sort((a: any, b: any) => b.total_masuk - a.total_masuk),
             by_program: Object.values(byProgram).sort((a: any, b: any) => b.total_masuk - a.total_masuk),
             by_jenis: Object.values(byJenis).sort((a: any, b: any) => b.total_masuk - a.total_masuk),
+            by_kategori: Object.values(byKategori).sort((a: any, b: any) => b.total_keluar - a.total_keluar),
             by_month: Object.values(byMonth).sort((a: any, b: any) => a.month.localeCompare(b.month)),
         })
     } catch (error: any) {

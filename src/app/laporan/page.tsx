@@ -311,11 +311,11 @@ export default function LaporanPage() {
                 </div>
               </div>
 
-              {/* Laporan Per Jenis Transaksi */}
+              {/* Laporan Per Jenis Transaksi (Masuk) */}
               <div className="card overflow-hidden">
                 <div className="p-4 border-b flex justify-between items-center" style={{ borderColor: 'var(--bg-border)' }}>
                   <h2 className="font-semibold text-sm flex items-center gap-2">
-                    <Briefcase size={16} style={{ color: 'var(--accent-gold)' }} /> By Jenis Transaksi
+                    <Briefcase size={16} style={{ color: '#22c55e' }} /> Sumber Pemasukan
                   </h2>
                 </div>
                 <div className="overflow-x-auto max-h-[400px]">
@@ -324,12 +324,11 @@ export default function LaporanPage() {
                       <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
                         <th className="text-left px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Jenis Transaksi</th>
                         <th className="text-right px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Pemasukan</th>
-                        <th className="text-right px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Pengeluaran</th>
                       </tr>
                     </thead>
                     <tbody>
                       {data?.by_jenis?.length === 0 ? (
-                        <tr><td colSpan={3} className="text-center py-8 text-xs" style={{ color: 'var(--text-secondary)' }}>Tidak ada data</td></tr>
+                        <tr><td colSpan={2} className="text-center py-8 text-xs" style={{ color: 'var(--text-secondary)' }}>Tidak ada data</td></tr>
                       ) : data?.by_jenis?.map((j: any, i: number) => (
                         <tr key={i} className="table-row-hover" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                           <td className="px-5 py-3 text-xs max-w-[200px] truncate">
@@ -341,8 +340,41 @@ export default function LaporanPage() {
                           <td className="px-5 py-3 text-right text-xs font-mono text-green-500">
                             +{formatRupiah(j.total_masuk)}
                           </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Laporan Per Kategori (Keluar) */}
+              <div className="card overflow-hidden">
+                <div className="p-4 border-b flex justify-between items-center" style={{ borderColor: 'var(--bg-border)' }}>
+                  <h2 className="font-semibold text-sm flex items-center gap-2">
+                    <TrendingDown size={16} style={{ color: '#ef4444' }} /> List Pengeluaran
+                  </h2>
+                </div>
+                <div className="overflow-x-auto max-h-[400px]">
+                  <table className="w-full text-sm relative">
+                    <thead className="sticky top-0 z-10" style={{ background: 'var(--bg-secondary)' }}>
+                      <tr style={{ borderBottom: '1px solid var(--bg-border)' }}>
+                        <th className="text-left px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Kategori Pengeluaran</th>
+                        <th className="text-right px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Pengeluaran</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data?.by_kategori?.length === 0 ? (
+                        <tr><td colSpan={2} className="text-center py-8 text-xs" style={{ color: 'var(--text-secondary)' }}>Tidak ada data</td></tr>
+                      ) : data?.by_kategori?.map((k: any, i: number) => (
+                        <tr key={i} className="table-row-hover" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                          <td className="px-5 py-3 text-xs max-w-[200px] truncate">
+                            <span>{k.kategori_nama}</span>
+                            <div className="text-[10px] mt-1 opacity-70">
+                              {k.count_keluar} transaksi
+                            </div>
+                          </td>
                           <td className="px-5 py-3 text-right text-xs font-mono text-red-500">
-                            -{formatRupiah(j.total_keluar)}
+                            -{formatRupiah(k.total_keluar)}
                           </td>
                         </tr>
                       ))}
