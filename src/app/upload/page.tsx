@@ -757,7 +757,7 @@ export default function UploadPage() {
                   {(() => {
                     const isAllSelectedKeluar = selectedIdx.length > 0 && selectedIdx.every(id => preview.find((r: any) => r._idx === id)?.tipe === 'keluar');
 
-                    if (isAllSelectedKeluar && mode !== 'qris') {
+                    if (isAllSelectedKeluar && mode !== 'qris' && mode !== 'qris-csv') {
                       return (
                         <select
                           value={bulkKategori || ''}
@@ -810,7 +810,7 @@ export default function UploadPage() {
                           className="rounded border-gray-600 bg-gray-700"
                         />
                       </th>
-                      {mode === 'qris' ? (
+                      {(mode === 'qris' || mode === 'qris-csv') ? (
                         <>
                           <th className="text-left px-3 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Tanggal</th>
                           <th className="text-left px-3 py-2 text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Merchant</th>
@@ -856,7 +856,7 @@ export default function UploadPage() {
                             />
                           )}
                         </td>
-                        {mode === 'qris' ? (
+                        {(mode === 'qris' || mode === 'qris-csv') ? (
                           <>
                             <td className="px-3 py-2 whitespace-nowrap">{row.created_date?.substring(0, 10)}</td>
                             <td className="px-3 py-2" style={{ maxWidth: 160 }}><div className="truncate">{row.merchant_name}</div></td>
