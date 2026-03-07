@@ -16,9 +16,16 @@ export default function LaporanPage() {
   })
   const [kementerianOptions, setKementerianOptions] = useState<any[]>([])
   const [programOptions, setProgramOptions] = useState<any[]>([])
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
-    fetchData()
+    const token = localStorage.getItem('admin_token')
+    if (token) {
+      setIsAdmin(true)
+      fetchData()
+    } else {
+      setLoading(false)
+    }
   }, [filters])
 
   useEffect(() => {
@@ -49,6 +56,32 @@ export default function LaporanPage() {
       console.error(e)
     }
     setLoading(false)
+  }
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-64">
+          <div className="spinner" />
+        </div>
+      </AppLayout>
+    )
+  }
+
+  if (!isAdmin) {
+    return (
+      <AppLayout>
+        <div className="flex flex-col items-center justify-center h-[70vh] text-center animate-in">
+          <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center mb-4 border border-red-500/20">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          </div>
+          <h2 className="text-xl font-bold mb-2" style={{ fontFamily: 'Syne, sans-serif' }}>Akses Terkunci</h2>
+          <p className="text-sm max-w-md mx-auto" style={{ color: 'var(--text-secondary)' }}>
+            Data laporan keuangan bersifat rahasia. Silakan klik tombol <b>Admin Login</b> di pojok kiri bawah untuk melihat Laporan.
+          </p>
+        </div>
+      </AppLayout>
+    )
   }
 
   return (
