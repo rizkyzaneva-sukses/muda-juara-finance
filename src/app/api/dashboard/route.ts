@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
         jenis_transaksi:jenis_transaksi_id(id, kode, nama),
         program_event:program_event_id(id, nama)
       `)
-      .eq('status', 'matched')
+      .in('status', ['matched', 'verified'])
 
     // Build rincian grouped
     const rincianMap = new Map()
