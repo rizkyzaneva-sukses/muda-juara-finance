@@ -15,6 +15,7 @@ export default function KoreksiPage() {
   const [bulkKem, setBulkKem] = useState('')
   const [bulkJenis, setBulkJenis] = useState('')
   const [bulkKat, setBulkKat] = useState('')
+  const [bulkProgram, setBulkProgram] = useState('')
   const [tipeFilter, setTipeFilter] = useState('')
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
@@ -90,7 +91,9 @@ export default function KoreksiPage() {
     for (const id of selected) {
       const t = transaksi.find(x => x.id === id)
       if (!t) continue
-      const updates: any = { id, kementerian_id: bulkKem ? parseInt(bulkKem) : null }
+      const updates: any = { id }
+      if (bulkKem) updates.kementerian_id = parseInt(bulkKem)
+      if (bulkProgram) updates.program_event_id = parseInt(bulkProgram)
       if (t.tipe === 'masuk' && bulkJenis) updates.jenis_transaksi_id = parseInt(bulkJenis)
       if (t.tipe === 'keluar' && bulkKat) updates.kategori_pengeluaran_id = parseInt(bulkKat)
       await fetch('/api/transaksi', {
@@ -153,6 +156,12 @@ export default function KoreksiPage() {
                 {kategoriPengeluaran.map(k => <option key={k.id} value={k.id}>{k.nama}</option>)}
               </select>
             )}
+            <select value={bulkProgram} onChange={e => setBulkProgram(e.target.value)} className="input-dark text-xs" style={{ width: 180 }}>
+              <option value="">Program / Event</option>
+              {filteredPrograms(bulkKem ? parseInt(bulkKem) : null).map(p => (
+                <option key={p.id} value={p.id}>{p.nama}{p.is_rutin ? ' (Rutin)' : ''}</option>
+              ))}
+            </select>
             <button onClick={applyBulk} className="btn-primary text-xs">Terapkan ke Semua</button>
             <button onClick={() => setSelected(new Set())} className="btn-secondary text-xs">Batal</button>
           </div>
