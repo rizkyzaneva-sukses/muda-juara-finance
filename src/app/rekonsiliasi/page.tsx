@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
 import { formatRupiah } from '@/lib/qris'
-import { RefreshCw, CheckCircle, AlertCircle, TrendingDown } from 'lucide-react'
+import { RefreshCw, CheckCircle, AlertCircle, Download } from 'lucide-react'
 
 export default function RekonsiliasiPage() {
   const [qrisData, setQrisData] = useState<any[]>([])
@@ -202,6 +202,41 @@ export default function RekonsiliasiPage() {
   const totalQris = overallStats.reduce((s, q) => s + q.amount, 0)
   const totalMatched = overallStats.filter(q => q.status === 'matched').reduce((s, q) => s + q.amount, 0)
 
+  const downloadCSV = async () => {
+    const params = new URLSearchParams()
+    params.append('limit', '999999')
+    params.append('page', '1')
+    if (statusFilter) params.append('status', statusFilter)
+    if (kementerianFilter) params.append('kementerian_id', kementerianFilter)
+    if (dateFrom) params.append('date_from', dateFrom)
+    if (dateTo) params.append('date_to', dateTo)
+
+    const res = await fetch(`/api/qris?${params.toString()}`)
+    const d = await res.json()
+    const rows = d.data || []
+    const headers = ['No', 'Tanggal', 'Merchant', 'Jumlah', 'Jumlah_Netto_MDR', 'Kementerian', 'Jenis', 'Program/Event', 'Status']
+    const MDR = 0.007
+    const lines = rows.map((q: any, i: number) => [
+      i + 1,
+      q.created_date?.substring(0, 10) || '',
+      `"${(q.merchant_name || '').replace(/"/g, '""')}"`,
+      q.amount,
+      Math.round(q.amount * (1 - MDR)),
+      q.kementerian ? `${q.kementerian.kode} - ${q.kementerian.nama}` : '',
+      q.jenis_transaksi?.nama || '',
+      q.program_event?.nama || '',
+      q.status
+    ].join(','))
+    const csv = [headers.join(','), ...lines].join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `qris_${new Date().toISOString().substring(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -212,10 +247,20 @@ export default function RekonsiliasiPage() {
               Cocokkan data QRIS dengan pencairan BCA Syariah
             </p>
           </div>
-          <button onClick={jalankanRekonsiliasi} disabled={running} className="btn-primary flex items-center gap-2">
-            {running ? <div className="spinner" style={{ width: 16, height: 16 }} /> : <RefreshCw size={14} />}
-            Jalankan Rekonsiliasi
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={downloadCSV}
+              className="btn-secondary flex items-center gap-2 text-xs"
+              title="Download data QRIS sesuai filter aktif"
+            >
+              <Download size={14} />
+              Download CSV
+            </button>
+            <button onClick={jalankanRekonsiliasi} disabled={running} className="btn-primary flex items-center gap-2">
+              {running ? <div className="spinner" style={{ width: 16, height: 16 }} /> : <RefreshCw size={14} />}
+              Jalankan Rekonsiliasi
+            </button>
+          </div>
         </div>
 
         {/* Stats */}

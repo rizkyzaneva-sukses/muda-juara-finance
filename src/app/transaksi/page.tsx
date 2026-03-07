@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
 import { formatRupiah } from '@/lib/qris'
-import { TrendingUp, TrendingDown, Search, Filter, ChevronLeft, ChevronRight, Edit2, Save, X } from 'lucide-react'
+import { TrendingUp, TrendingDown, Search, ChevronLeft, ChevronRight, Edit2, Save, X, Download } from 'lucide-react'
 
 export default function TransaksiPage() {
   const [data, setData] = useState<any[]>([])
@@ -69,6 +69,38 @@ export default function TransaksiPage() {
   }
 
   const totalPages = Math.ceil(count / 20)
+
+  const downloadCSV = async () => {
+    const params = new URLSearchParams({
+      limit: '999999',
+      page: '1',
+      ...Object.fromEntries(Object.entries(filters).filter(([, v]) => v)),
+    })
+    const res = await fetch(`/api/transaksi?${params}`)
+    const d = await res.json()
+    const rows = d.data || []
+    const headers = ['No', 'Tanggal', 'Keterangan', 'Tipe', 'Jumlah', 'Sumber', 'Kementerian', 'Jenis Transaksi', 'Program/Event', 'Status']
+    const lines = rows.map((t: any, i: number) => [
+      i + 1,
+      t.tanggal || t.created_at?.substring(0, 10) || '',
+      `"${(t.keterangan || '').replace(/"/g, '""')}"`,
+      t.tipe,
+      t.jumlah,
+      t.sumber,
+      t.kementerian ? `${t.kementerian.kode} - ${t.kementerian.nama}` : '',
+      t.jenis_transaksi?.nama || '',
+      t.program_event?.nama || t.kategori_pengeluaran?.nama || '',
+      t.status
+    ].join(','))
+    const csv = [headers.join(','), ...lines].join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `transaksi_${new Date().toISOString().substring(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const statusColor: Record<string, string> = {
     valid: 'badge-valid',
@@ -188,6 +220,14 @@ export default function TransaksiPage() {
             <h1 className="text-2xl font-bold" style={{ fontFamily: 'Syne, sans-serif' }}>Transaksi</h1>
             <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>{count} total transaksi</p>
           </div>
+          <button
+            onClick={downloadCSV}
+            className="btn-secondary flex items-center gap-2 text-xs"
+            title="Download data sesuai filter aktif sebagai CSV"
+          >
+            <Download size={14} />
+            Download CSV
+          </button>
         </div>
 
         {/* Filters */}
