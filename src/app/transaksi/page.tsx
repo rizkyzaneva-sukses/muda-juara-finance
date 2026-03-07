@@ -158,10 +158,18 @@ export default function TransaksiPage() {
     const token = localStorage.getItem('admin_token')
 
     const updates: any = {}
-    if (bulkKem) updates.kementerian_id = bulkKem
-    if (bulkProgram) updates.program_event_id = bulkProgram
-    if (bulkJenis) updates.jenis_transaksi_id = bulkJenis
-    if (bulkKategori) updates.kategori_pengeluaran_id = bulkKategori
+
+    if (bulkKem === 'clear') updates.kementerian_id = null
+    else if (bulkKem) updates.kementerian_id = bulkKem
+
+    if (bulkProgram === 'clear') updates.program_event_id = null
+    else if (bulkProgram) updates.program_event_id = bulkProgram
+
+    if (bulkJenis === 'clear') updates.jenis_transaksi_id = null
+    else if (bulkJenis) updates.jenis_transaksi_id = bulkJenis
+
+    if (bulkKategori === 'clear') updates.kategori_pengeluaran_id = null
+    else if (bulkKategori) updates.kategori_pengeluaran_id = bulkKategori
 
     try {
       const res = await fetch('/api/transaksi', {
@@ -305,6 +313,7 @@ export default function TransaksiPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <select className="input-dark text-xs py-1" style={{ width: 140 }} value={bulkKem} onChange={e => setBulkKem(e.target.value)}>
                   <option value="">— Kementerian —</option>
+                  <option value="clear">❌ Kosongkan</option>
                   {kementerian.map((k: any) => <option key={k.id} value={k.id}>{k.nama}</option>)}
                 </select>
 
@@ -314,6 +323,7 @@ export default function TransaksiPage() {
                     return (
                       <select className="input-dark text-xs py-1" style={{ width: 140 }} value={bulkKategori} onChange={e => setBulkKategori(e.target.value)}>
                         <option value="">— Jenis Transaksi —</option>
+                        <option value="clear">❌ Kosongkan</option>
                         {kategoriPengeluaran.map((kp: any) => <option key={kp.id} value={kp.id}>{kp.nama}</option>)}
                       </select>
                     );
@@ -321,6 +331,7 @@ export default function TransaksiPage() {
                   return (
                     <select className="input-dark text-xs py-1" style={{ width: 140 }} value={bulkJenis} onChange={e => setBulkJenis(e.target.value)}>
                       <option value="">— Jenis Transaksi —</option>
+                      <option value="clear">❌ Kosongkan</option>
                       {jenisTransaksi.map((j: any) => <option key={j.id} value={j.id}>{j.nama}</option>)}
                     </select>
                   );
@@ -328,6 +339,7 @@ export default function TransaksiPage() {
 
                 <select className="input-dark text-xs py-1" style={{ width: 140 }} value={bulkProgram} onChange={e => setBulkProgram(e.target.value)}>
                   <option value="">— Program Event —</option>
+                  <option value="clear">❌ Kosongkan</option>
                   {programEvent.map((p: any) => <option key={p.id} value={p.id}>{p.nama}</option>)}
                 </select>
                 <button onClick={applyBulkEdit} disabled={bulkSaving} className="btn-primary py-1 px-4 text-xs font-medium h-[28px]">

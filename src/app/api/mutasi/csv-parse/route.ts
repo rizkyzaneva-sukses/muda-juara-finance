@@ -161,7 +161,13 @@ export async function POST(req: NextRequest) {
             let programId: number | null = lookupId(programCol, programByNama)
             let status = isAutoWait ? 'valid' : 'cek_manual'
 
-            if (tipe === 'masuk') {
+            if (isAutoWait) {
+                // Untuk "Pencairan QRIS" / MYBB, ini netral, jadi semua mapping dihapus.
+                kemId = null
+                jenisId = null
+                kategoriId = null
+                programId = null
+            } else if (tipe === 'masuk') {
                 jenisId = lookupId(jenisCol, jenisByNama, jenisByKodeNama)
 
                 // If not found in CSV, try QRIS auto-parse
