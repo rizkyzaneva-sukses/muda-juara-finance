@@ -38,6 +38,11 @@ export async function POST(req: NextRequest) {
     const kemMap = new Map(kementerian?.map(k => [k.kode, k.id]) || [])
     const jenisMap = new Map(jenisTransaksi?.map(j => [j.kode, j.id]) || [])
 
+    const normalizeStr = (str: string) => {
+      if (!str) return ''
+      return str.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 40)
+    }
+
     // Check existing transaksi for duplicate detection
     const { data: existing } = await supabaseAdmin
       .from('transaksi')
@@ -45,13 +50,13 @@ export async function POST(req: NextRequest) {
       .eq('sumber', bank)
 
     const existingSet = new Set(
-      existing?.map(t => `${t.tanggal}-${t.keterangan?.substring(0, 30)}-${t.jumlah}`) || []
+      existing?.map(t => `${t.tanggal}-${normalizeStr(t.keterangan)}-${t.jumlah}`) || []
     )
 
     // Process parsed transactions
     const preview = parsed.map((t, idx) => {
       const isDuplicate = existingSet.has(
-        `${t.tanggal}-${t.keterangan?.substring(0, 30)}-${t.kredit || t.debit}`
+        `${t.tanggal}-${normalizeStr(t.keterangan)}-${t.kredit || t.debit}`
       )
 
       const tipe = t.kredit > 0 ? 'masuk' : 'keluar'
