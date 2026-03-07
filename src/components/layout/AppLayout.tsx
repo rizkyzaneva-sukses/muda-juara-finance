@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Upload, RefreshCw, AlertCircle,
   FileText, CreditCard, Settings, Terminal,
-  Lock, Unlock, Menu, X, ChevronRight, Coins
+  Lock, Unlock, Menu, X, ChevronRight, Coins, BookOpen
 } from 'lucide-react'
 
 const navItems = [
@@ -16,6 +16,7 @@ const navItems = [
   { href: '/rekonsiliasi', label: 'Rekonsiliasi QRIS', icon: RefreshCw, public: false },
   { href: '/koreksi', label: 'Koreksi', icon: AlertCircle, public: false },
   { href: '/master-data', label: 'Master Data', icon: Settings, public: false },
+  { href: '/panduan', label: 'Panduan', icon: BookOpen, public: true },
   { href: '/dev', label: 'Dev Room', icon: Terminal, public: false },
 ]
 
