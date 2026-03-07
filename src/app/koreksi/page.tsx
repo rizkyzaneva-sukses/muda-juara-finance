@@ -8,11 +8,13 @@ export default function KoreksiPage() {
   const [transaksi, setTransaksi] = useState<any[]>([])
   const [kementerian, setKementerian] = useState<any[]>([])
   const [jenisTransaksi, setJenisTransaksi] = useState<any[]>([])
+  const [kategoriPengeluaran, setKategoriPengeluaran] = useState<any[]>([])
   const [programEvent, setProgramEvent] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [bulkKem, setBulkKem] = useState('')
   const [bulkJenis, setBulkJenis] = useState('')
+  const [bulkKat, setBulkKat] = useState('')
   const [tipeFilter, setTipeFilter] = useState('')
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
 
@@ -26,18 +28,20 @@ export default function KoreksiPage() {
   const loadAll = async () => {
     setLoading(true)
     const token = localStorage.getItem('admin_token')
-    const [trxRes, kemRes, jenisRes, progRes] = await Promise.all([
+    const [trxRes, kemRes, jenisRes, katRes, progRes] = await Promise.all([
       fetch(`/api/transaksi?status=cek_manual&limit=100${tipeFilter ? `&tipe=${tipeFilter}` : ''}`),
       fetch('/api/master?entity=kementerian'),
       fetch('/api/master?entity=jenis-transaksi'),
+      fetch('/api/master?entity=kategori-pengeluaran'),
       fetch('/api/master?entity=program-event'),
     ])
-    const [trxData, kemData, jenisData, progData] = await Promise.all([
-      trxRes.json(), kemRes.json(), jenisRes.json(), progRes.json()
+    const [trxData, kemData, jenisData, katData, progData] = await Promise.all([
+      trxRes.json(), kemRes.json(), jenisRes.json(), katRes.json(), progRes.json()
     ])
     setTransaksi(trxData.data || [])
     setKementerian(kemData.data || [])
     setJenisTransaksi(jenisData.data || [])
+    setKategoriPengeluaran(katData.data || [])
     setProgramEvent(progData.data || [])
     setLoading(false)
   }
@@ -51,8 +55,12 @@ export default function KoreksiPage() {
     const updates: any = {
       id: t.id,
       kementerian_id: t.kementerian_id || null,
-      jenis_transaksi_id: t.jenis_transaksi_id || null,
       program_event_id: t.program_event_id || null,
+    }
+    if (t.tipe === 'masuk') {
+      updates.jenis_transaksi_id = t.jenis_transaksi_id || null
+    } else {
+      updates.kategori_pengeluaran_id = t.kategori_pengeluaran_id || null
     }
     const res = await fetch('/api/transaksi', {
       method: 'PATCH',
@@ -83,7 +91,8 @@ export default function KoreksiPage() {
       const t = transaksi.find(x => x.id === id)
       if (!t) continue
       const updates: any = { id, kementerian_id: bulkKem ? parseInt(bulkKem) : null }
-      if (bulkJenis) updates.jenis_transaksi_id = parseInt(bulkJenis)
+      if (t.tipe === 'masuk' && bulkJenis) updates.jenis_transaksi_id = parseInt(bulkJenis)
+      if (t.tipe === 'keluar' && bulkKat) updates.kategori_pengeluaran_id = parseInt(bulkKat)
       await fetch('/api/transaksi', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -132,10 +141,18 @@ export default function KoreksiPage() {
               <option value="">Kementerian</option>
               {kementerian.map(k => <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>)}
             </select>
-            <select value={bulkJenis} onChange={e => setBulkJenis(e.target.value)} className="input-dark text-xs" style={{ width: 180 }}>
-              <option value="">Jenis Transaksi</option>
-              {jenisTransaksi.map(j => <option key={j.id} value={j.id}>{j.kode} - {j.nama}</option>)}
-            </select>
+            {Array.from(selected).some(id => transaksi.find(t => t.id === id)?.tipe === 'masuk') && (
+              <select value={bulkJenis} onChange={e => setBulkJenis(e.target.value)} className="input-dark text-xs" style={{ width: 160 }}>
+                <option value="">Jenis (Masuk)</option>
+                {jenisTransaksi.map(j => <option key={j.id} value={j.id}>{j.kode} - {j.nama}</option>)}
+              </select>
+            )}
+            {Array.from(selected).some(id => transaksi.find(t => t.id === id)?.tipe === 'keluar') && (
+              <select value={bulkKat} onChange={e => setBulkKat(e.target.value)} className="input-dark text-xs" style={{ width: 180 }}>
+                <option value="">Kategori (Keluar)</option>
+                {kategoriPengeluaran.map(k => <option key={k.id} value={k.id}>{k.nama}</option>)}
+              </select>
+            )}
             <button onClick={applyBulk} className="btn-primary text-xs">Terapkan ke Semua</button>
             <button onClick={() => setSelected(new Set())} className="btn-secondary text-xs">Batal</button>
           </div>
@@ -218,15 +235,27 @@ export default function KoreksiPage() {
                       {kementerian.map(k => <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>)}
                     </select>
 
-                    <select
-                      value={t.jenis_transaksi_id || ''}
-                      onChange={e => updateLocal(t.id, { jenis_transaksi_id: e.target.value ? parseInt(e.target.value) : null })}
-                      className="input-dark text-xs"
-                      style={{ width: 200 }}
-                    >
-                      <option value="">Jenis Transaksi</option>
-                      {jenisTransaksi.map(j => <option key={j.id} value={j.id}>{j.kode} - {j.nama}</option>)}
-                    </select>
+                    {t.tipe === 'masuk' ? (
+                      <select
+                        value={t.jenis_transaksi_id || ''}
+                        onChange={e => updateLocal(t.id, { jenis_transaksi_id: e.target.value ? parseInt(e.target.value) : null })}
+                        className="input-dark text-xs"
+                        style={{ width: 200 }}
+                      >
+                        <option value="">Jenis Transaksi</option>
+                        {jenisTransaksi.map(j => <option key={j.id} value={j.id}>{j.kode} - {j.nama}</option>)}
+                      </select>
+                    ) : (
+                      <select
+                        value={t.kategori_pengeluaran_id || ''}
+                        onChange={e => updateLocal(t.id, { kategori_pengeluaran_id: e.target.value ? parseInt(e.target.value) : null })}
+                        className="input-dark text-xs"
+                        style={{ width: 200 }}
+                      >
+                        <option value="">Kategori Pengeluaran</option>
+                        {kategoriPengeluaran.map(k => <option key={k.id} value={k.id}>{k.nama}</option>)}
+                      </select>
+                    )}
 
                     <select
                       value={t.program_event_id || ''}
