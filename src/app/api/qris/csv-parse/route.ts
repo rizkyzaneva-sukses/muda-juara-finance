@@ -86,7 +86,13 @@ export async function POST(req: NextRequest) {
                 const [dd, mm, yyyy] = s.split('-')
                 return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`
             }
-            if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10)
+            if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+                const [yyyy, p1, p2] = s.substring(0, 10).split('-')
+                if (Number(p1) > 12 && Number(p2) <= 12) {
+                    return `${yyyy}-${p2}-${p1}`
+                }
+                return s.substring(0, 10)
+            }
             return s
         }
 

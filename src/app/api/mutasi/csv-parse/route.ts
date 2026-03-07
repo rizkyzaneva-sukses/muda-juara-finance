@@ -111,8 +111,15 @@ export async function POST(req: NextRequest) {
                 return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`
             }
 
-            // Sudah format YYYY-MM-DD atau ISO
-            if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10)
+            // Sudah format YYYY-MM-DD atau YYYY-DD-MM atau ISO
+            if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+                const [yyyy, p1, p2] = s.substring(0, 10).split('-')
+                // Jika p1 > 12, berarti formatnya YYYY-DD-MM (misal 2026-28-02), jadi ditukar jadi YYYY-MM-DD
+                if (Number(p1) > 12 && Number(p2) <= 12) {
+                    return `${yyyy}-${p2}-${p1}`
+                }
+                return s.substring(0, 10)
+            }
 
             return s
         }
