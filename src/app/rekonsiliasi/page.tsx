@@ -196,6 +196,7 @@ export default function RekonsiliasiPage() {
     pending: overallStats.filter(q => q.status === 'pending').length,
     matched: overallStats.filter(q => q.status === 'matched').length,
     cek_manual: overallStats.filter(q => q.status === 'cek_manual').length,
+    verified: overallStats.filter(q => q.status === 'verified').length,
   }
 
   const totalQris = overallStats.reduce((s, q) => s + q.amount, 0)
@@ -218,7 +219,7 @@ export default function RekonsiliasiPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 md:grid-cols-5 gap-4">
           <div className="card p-4">
             <div className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Total QRIS</div>
             <div className="text-lg font-bold" style={{ color: 'var(--accent-green)' }}>{formatRupiah(totalQris)}</div>
@@ -235,6 +236,10 @@ export default function RekonsiliasiPage() {
           <div className="card p-4">
             <div className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Cek Manual</div>
             <div className="text-lg font-bold" style={{ color: '#ef4444' }}>{statusCount.cek_manual}</div>
+          </div>
+          <div className="card p-4">
+            <div className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Verified</div>
+            <div className="text-lg font-bold" style={{ color: '#3b82f6' }}>{statusCount.verified}</div>
           </div>
         </div>
 
@@ -324,6 +329,7 @@ export default function RekonsiliasiPage() {
                 <option value="pending">Pending</option>
                 <option value="matched">Matched</option>
                 <option value="cek_manual">Cek Manual</option>
+                <option value="verified">Verified</option>
                 <option value="valid">Valid</option>
               </select>
             </div>
@@ -424,7 +430,10 @@ export default function RekonsiliasiPage() {
                     </td>
                     <td className="px-4 py-2.5">
                       <span className={`px-2 py-0.5 rounded text-xs ${q.status === 'matched' ? 'badge-valid' :
-                        q.status === 'cek_manual' ? 'badge-cek-manual' : 'badge-lainnya'
+                        q.status === 'verified' ? 'bg-blue-500/10 text-blue-500 border border-blue-500/20' :
+                          q.status === 'cek_manual' ? 'badge-cek-manual' :
+                            q.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/10' :
+                              'badge-lainnya'
                         }`}>
                         {q.status}
                       </span>

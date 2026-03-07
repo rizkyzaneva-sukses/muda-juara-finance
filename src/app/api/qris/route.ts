@@ -13,18 +13,30 @@ export async function POST(req: NextRequest) {
   try {
     const { rows } = await req.json()
 
-    const toInsert = rows.map((r: any) => ({
-      created_date: r.created_date,
-      merchant_name: r.merchant_name,
-      merchant_id: r.merchant_id,
-      tid: r.tid,
-      amount: Math.round(Number(r.amount)),
-      transaction_type: r.transaction_type,
-      kementerian_id: r.kementerian_id,
-      jenis_transaksi_id: r.jenis_transaksi_id,
-      program_event_id: r.program_event_id || null,
-      status: r.status || 'pending',
-    }))
+    const toInsert = rows.map((r: any) => {
+      const kId = r.kementerian_id
+      const jId = r.jenis_transaksi_id
+      const pId = r.program_event_id || null
+      let status = r.status || 'pending'
+
+      const filledCount = [kId, jId, pId].filter(x => x).length
+      if (status !== 'matched' && filledCount >= 2) {
+        status = 'verified'
+      }
+
+      return {
+        created_date: r.created_date,
+        merchant_name: r.merchant_name,
+        merchant_id: r.merchant_id,
+        tid: r.tid,
+        amount: Math.round(Number(r.amount)),
+        transaction_type: r.transaction_type,
+        kementerian_id: kId,
+        jenis_transaksi_id: jId,
+        program_event_id: pId,
+        status: status,
+      }
+    })
 
     const { data, error } = await supabaseAdmin
       .from('transaksi_qris')
@@ -98,13 +110,49 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data: currentRows, error: fetchErr } = await supabaseAdmin
+      .from('transaksi_qris')
+      .select('id, kementerian_id, jenis_transaksi_id, program_event_id, status')
+      .in('id', ids)
+
+    if (fetchErr) throw fetchErr
+
+    const toUpdateVerified: string[] = []
+    const toUpdatePending: string[] = []
+
+    currentRows?.forEach(row => {
+      if (row.status === 'matched') return
+
+      const kId = updates.kementerian_id !== undefined ? updates.kementerian_id : row.kementerian_id
+      const jId = updates.jenis_transaksi_id !== undefined ? updates.jenis_transaksi_id : row.jenis_transaksi_id
+      const pId = updates.program_event_id !== undefined ? updates.program_event_id : row.program_event_id
+
+      const filledCount = [kId, jId, pId].filter(x => x).length
+
+      // Assume "verified" if >= 2 fields are filled
+      if (filledCount >= 2) {
+        toUpdateVerified.push(row.id)
+      } else {
+        toUpdatePending.push(row.id)
+      }
+    })
+
+    // Perform the standard updates first (like kementerian_id, dll)
+    let { data, error } = await supabaseAdmin
       .from('transaksi_qris')
       .update(updates)
       .in('id', ids)
       .select()
 
     if (error) throw error
+
+    // Apply the auto verified statuses
+    if (toUpdateVerified.length > 0) {
+      await supabaseAdmin.from('transaksi_qris').update({ status: 'verified' }).in('id', toUpdateVerified)
+    }
+    if (toUpdatePending.length > 0) {
+      await supabaseAdmin.from('transaksi_qris').update({ status: 'pending' }).in('id', toUpdatePending)
+    }
 
     return NextResponse.json({ updated: data?.length, data })
   } catch (error: any) {

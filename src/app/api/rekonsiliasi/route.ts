@@ -51,12 +51,18 @@ export async function POST(req: NextRequest) {
     Array.from(qrisByDate.entries()).forEach(([date, qris]) => {
       totalQris += qris.total
 
-      // Try same day first, then next day
-      const nextDate = new Date(date)
-      nextDate.setDate(nextDate.getDate() + 1)
-      const nextDateStr = nextDate.toISOString().substring(0, 10)
+      // Try up to 4 days ahead to account for weekends and bank holidays
+      let bcaMatch = null
+      for (let i = 0; i <= 4; i++) {
+        const checkDate = new Date(date)
+        checkDate.setDate(checkDate.getDate() + i)
+        const checkDateStr = checkDate.toISOString().substring(0, 10)
 
-      const bcaMatch = bcaByDate.get(date) || bcaByDate.get(nextDateStr)
+        if (bcaByDate.has(checkDateStr)) {
+          bcaMatch = bcaByDate.get(checkDateStr)
+          break
+        }
+      }
 
       if (bcaMatch) {
         const selisih = qris.total - bcaMatch.total
