@@ -23,6 +23,7 @@ export async function GET(req: NextRequest) {
       `)
             .in('status', ['valid', 'koreksi', 'lainnya'])
             .order('tanggal', { ascending: false })
+            .limit(100000)
 
         if (dateFrom) query = query.gte('tanggal', dateFrom)
         if (dateTo) query = query.lte('tanggal', dateTo)
@@ -30,8 +31,50 @@ export async function GET(req: NextRequest) {
         if (programId) query = query.eq('program_event_id', programId)
         if (sumber) query = query.eq('sumber', sumber)
 
-        const { data: transaksi, error } = await query
+        const { data: dbTransaksi, error } = await query
         if (error) throw error
+
+        let transaksi = [...(dbTransaksi || [])]
+
+        // Fetch QRIS data if sumber is empty or specifically asking for QRIS
+        if (!sumber || sumber === 'QRIS') {
+            let qrisQuery = supabaseAdmin
+                .from('transaksi_qris')
+                .select(`
+                    *,
+                    kementerian:kementerian_id(id, kode, nama),
+                    jenis_transaksi:jenis_transaksi_id(id, kode, nama),
+                    program_event:program_event_id(id, nama)
+                `)
+                .eq('status', 'matched')
+                .limit(100000)
+
+            if (dateFrom) qrisQuery = qrisQuery.gte('created_date', dateFrom)
+            if (dateTo) qrisQuery = qrisQuery.lte('created_date', dateTo)
+            if (kemId) qrisQuery = qrisQuery.eq('kementerian_id', kemId)
+            if (programId) qrisQuery = qrisQuery.eq('program_event_id', programId)
+
+            const { data: qrisData } = await qrisQuery
+
+            const mappedQris = qrisData?.map(q => ({
+                id: 'qris-' + q.id,
+                keterangan: 'QRIS - ' + (q.merchant_name || 'Transaksi'),
+                jumlah: q.amount,
+                sumber: 'QRIS',
+                tipe: 'masuk', // QRIS is generally incoming
+                tanggal: q.created_date ? q.created_date.substring(0, 10) : '',
+                kementerian_id: q.kementerian_id,
+                jenis_transaksi_id: q.jenis_transaksi_id,
+                program_event_id: q.program_event_id,
+                kementerian: q.kementerian,
+                jenis_transaksi: q.jenis_transaksi,
+                program_event: q.program_event,
+                kategori_pengeluaran: null,
+                status: 'valid' // 'matched' qris behaves as valid transaction
+            })) || []
+
+            transaksi = [...transaksi, ...mappedQris]
+        }
 
         // Summary by kementerian
         const byKem: Record<string, any> = {}
