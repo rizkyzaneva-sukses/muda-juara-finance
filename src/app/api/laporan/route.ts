@@ -76,6 +76,42 @@ export async function GET(req: NextRequest) {
             transaksi = [...transaksi, ...mappedQris]
         }
 
+        // --- INJECT SALDO AWAL ---
+        const { data: rekening } = await supabaseAdmin.from('rekening').select('*')
+        const rekeningBCA = rekening?.find(r => r.bank?.toUpperCase() === 'BCA SYARIAH')
+        const rekeningBSI = rekening?.find(r => r.bank?.toUpperCase() === 'BSI')
+        const saldoAwalBCA = rekeningBCA?.saldo_awal || 0
+        const saldoAwalBSI = rekeningBSI?.saldo_awal || 0
+        const isBCAFilter = sumber === 'BCA'
+        const isBSIFilter = sumber === 'BSI'
+
+        // If not filtered by date, kem, program...
+        // Or actually let's just show it if no program/kementerian filter is applied
+        if (!kemId && !programId) {
+            const injectSaldo = (bankNama: string, amount: number) => {
+                if (amount <= 0) return
+                transaksi.push({
+                    id: `saldo-awal-${bankNama}`,
+                    keterangan: `Saldo Awal Rekening ${bankNama}`,
+                    jumlah: amount,
+                    sumber: bankNama,
+                    tipe: 'masuk',
+                    tanggal: '2026-01-01', // Dummy early date
+                    kementerian_id: 999999,
+                    jenis_transaksi_id: 999999,
+                    program_event_id: 999999,
+                    kementerian: { id: 999999, kode: 'SA', nama: 'SALDO AWAL' },
+                    jenis_transaksi: { id: 999999, kode: 'SA', nama: 'KAS' },
+                    program_event: { id: 999999, nama: 'KAS' },
+                    kategori_pengeluaran: null,
+                    status: 'valid'
+                })
+            }
+            if (!sumber || isBCAFilter) injectSaldo('BCA', saldoAwalBCA)
+            if (!sumber || isBSIFilter) injectSaldo('BSI', saldoAwalBSI)
+        }
+
+
         // Summary by kementerian
         const byKem: Record<string, any> = {}
         transaksi?.forEach(t => {

@@ -164,19 +164,19 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    // Inject Saldo Awal row to balance the total
-    const totalSaldoAwal = totalMasukBCA + totalMasukBSI
-    if (totalSaldoAwal > 0) {
+    // Inject Saldo Awal row explicitly as an independent "Kementerian"
+    const realSaldoAwal = (rekeningBCA?.saldo_awal || 0) + (rekeningBSI?.saldo_awal || 0)
+    if (realSaldoAwal > 0) {
       rincianMap.set('saldo_awal', {
-        kementerian_id: null,
-        kementerian_kode: null,
-        kementerian_nama: 'Tanpa Kementerian',
-        jenis_id: null,
-        jenis_kode: null,
-        jenis_nama: 'Saldo Awal Rekening',
-        program_id: null,
-        program_nama: 'Kas Sistem',
-        txn: 0, qris: 0, transfer: totalSaldoAwal, pengeluaran: 0, sisa: 0, persen: 0
+        kementerian_id: 999999,
+        kementerian_kode: 'SA',
+        kementerian_nama: 'Saldo Awal Sistem',
+        jenis_id: 999999,
+        jenis_kode: 'SA',
+        jenis_nama: 'Pemasukan Kas',
+        program_id: 999999,
+        program_nama: 'Saldo Kas',
+        txn: 0, qris: 0, transfer: realSaldoAwal, pengeluaran: 0, sisa: 0, persen: 0
       })
     }
 
