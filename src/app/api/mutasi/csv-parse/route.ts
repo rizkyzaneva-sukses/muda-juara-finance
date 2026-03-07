@@ -3,6 +3,26 @@ import { isAdminRequest } from '@/lib/auth'
 import { parseQrisCode, isAutoSkipMybb } from '@/lib/qris'
 import { supabaseAdmin } from '@/lib/supabase'
 
+export async function GET(req: NextRequest) {
+    // Endpoint untuk mengambil master data (untuk keperluan template CSV)
+    try {
+        const [k, j, kp, pe] = await Promise.all([
+            supabaseAdmin.from('kementerian').select('id, kode, nama').order('kode'),
+            supabaseAdmin.from('jenis_transaksi').select('id, kode, nama').order('kode'),
+            supabaseAdmin.from('kategori_pengeluaran').select('id, nama').order('nama'),
+            supabaseAdmin.from('program_event').select('id, nama').order('nama'),
+        ])
+        return NextResponse.json({
+            kementerian: k.data || [],
+            jenis_transaksi: j.data || [],
+            kategori_pengeluaran: kp.data || [],
+            program_event: pe.data || [],
+        })
+    } catch (error: any) {
+        return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+}
+
 export async function POST(req: NextRequest) {
     if (!isAdminRequest(req)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -10,21 +30,50 @@ export async function POST(req: NextRequest) {
 
     try {
         const { rows, bank } = await req.json()
-        // rows: array parsed dari CSV di client side
-        // Format kolom CSV: tanggal, keterangan, debit, kredit, sumber
 
-        const { data: kementerian } = await supabaseAdmin.from('kementerian').select('*')
-        const { data: jenisTransaksi } = await supabaseAdmin.from('jenis_transaksi').select('*')
+        // Load all master data for lookup
+        const [kemData, jenisData, kategoriData, programData] = await Promise.all([
+            supabaseAdmin.from('kementerian').select('id, kode, nama'),
+            supabaseAdmin.from('jenis_transaksi').select('id, kode, nama'),
+            supabaseAdmin.from('kategori_pengeluaran').select('id, nama'),
+            supabaseAdmin.from('program_event').select('id, nama'),
+        ])
 
-        const kemMap = new Map(kementerian?.map(k => [k.kode, k.id]) || [])
-        const jenisMap = new Map(jenisTransaksi?.map(j => [j.kode, j.id]) || [])
+        const kementerian = kemData.data || []
+        const jenisTransaksi = jenisData.data || []
+        const kategoriPengeluaran = kategoriData.data || []
+        const programEvent = programData.data || []
 
+        // Auto-parse maps (by kode QRIS)
+        const kemByKode = new Map(kementerian.map(k => [k.kode, k.id]))
+        const jenisByKode = new Map(jenisTransaksi.map(j => [j.kode, j.id]))
+
+        // Lookup maps by nama (case-insensitive, trimmed)
+        const normalize = (s: string) => (s || '').toLowerCase().trim()
+
+        const kemByNama = new Map(kementerian.map(k => [normalize(k.nama), k.id]))
+        const kemByKodeNama = new Map(kementerian.map(k => [normalize(k.kode), k.id]))
+        const jenisByNama = new Map(jenisTransaksi.map(j => [normalize(j.nama), j.id]))
+        const jenisByKodeNama = new Map(jenisTransaksi.map(j => [normalize(j.kode), j.id]))
+        const kategoriByNama = new Map(kategoriPengeluaran.map(k => [normalize(k.nama), k.id]))
+        const programByNama = new Map(programEvent.map(p => [normalize(p.nama), p.id]))
+
+        const lookupId = (
+            value: string,
+            byNama: Map<string, number>,
+            byKode?: Map<string, number>
+        ): number | null => {
+            if (!value || !value.trim()) return null
+            const n = normalize(value)
+            return byNama.get(n) || byKode?.get(n) || null
+        }
+
+        // Duplicate detection
         const normalizeStr = (str: string) => {
             if (!str) return ''
             return str.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 40)
         }
 
-        // Check duplicates against existing data
         const sumber = bank || 'manual'
         const { data: existing } = await supabaseAdmin
             .from('transaksi')
@@ -36,12 +85,17 @@ export async function POST(req: NextRequest) {
         )
 
         const preview = rows.map((row: any, idx: number) => {
-            // Normalize field names - support both UPPERCASE and lowercase
-            const tanggal = (row.tanggal || row.TANGGAL || '').toString().trim()
-            const keterangan = (row.keterangan || row.KETERANGAN || row.deskripsi || row.DESKRIPSI || '').toString().trim()
-            const debitRaw = row.debit || row.DEBIT || row.debet || row.DEBET || 0
-            const kreditRaw = row.kredit || row.KREDIT || row.kredit || 0
-            const sumberRow = (row.sumber || row.SUMBER || sumber || 'manual').toString().trim()
+            const tanggal = (row.tanggal || '').toString().trim()
+            const keterangan = (row.keterangan || row.deskripsi || '').toString().trim()
+            const debitRaw = row.debit || row.debet || 0
+            const kreditRaw = row.kredit || 0
+            const sumberRow = (row.sumber || sumber || 'manual').toString().trim()
+
+            // Kolom baru dari CSV
+            const kemCol = (row.kementerian || '').toString().trim()
+            const jenisCol = (row.jenis_transaksi || row.jenis || '').toString().trim()
+            const kategoriCol = (row.kategori_pengeluaran || row.kategori || '').toString().trim()
+            const programCol = (row.program_event || row.program || row.event || '').toString().trim()
 
             const debit = typeof debitRaw === 'string'
                 ? parseInt(debitRaw.replace(/[^0-9]/g, '') || '0', 10)
@@ -60,17 +114,35 @@ export async function POST(req: NextRequest) {
 
             const isAutoWait = isAutoSkipMybb(keterangan)
 
-            let kemId = null
-            let jenisId = null
+            // Priority: CSV column value → QRIS auto parse
+            let kemId: number | null = lookupId(kemCol, kemByNama, kemByKodeNama)
+            let jenisId: number | null = null
+            let kategoriId: number | null = null
+            let programId: number | null = lookupId(programCol, programByNama)
             let status = isAutoWait ? 'valid' : 'cek_manual'
 
-            if (tipe === 'masuk' && !isAutoWait) {
-                const code = parseQrisCode(jumlah)
-                if (code.status === 'valid') {
-                    kemId = kemMap.get(code.ministryCode) || null
-                    jenisId = jenisMap.get(code.transactionCode) || null
-                    status = 'valid'
+            if (tipe === 'masuk') {
+                jenisId = lookupId(jenisCol, jenisByNama, jenisByKodeNama)
+
+                // If not found in CSV, try QRIS auto-parse
+                if (!kemId || !jenisId) {
+                    const code = parseQrisCode(jumlah)
+                    if (code.status === 'valid') {
+                        if (!kemId) kemId = kemByKode.get(code.ministryCode) || null
+                        if (!jenisId) jenisId = jenisByKode.get(code.transactionCode) || null
+                    }
                 }
+            } else {
+                // keluar: use kategori_pengeluaran
+                kategoriId = lookupId(kategoriCol, kategoriByNama)
+                    || lookupId(jenisCol, kategoriByNama)
+            }
+
+            // Determine status based on filled data
+            if (!isAutoWait) {
+                const filled = [kemId, tipe === 'masuk' ? jenisId : kategoriId].filter(Boolean).length
+                if (filled >= 2) status = 'valid'
+                else if (filled >= 1) status = 'valid'
             }
 
             return {
@@ -85,10 +157,15 @@ export async function POST(req: NextRequest) {
                 status,
                 kementerian_id: kemId,
                 jenis_transaksi_id: jenisId,
-                kategori_pengeluaran_id: null,
-                program_event_id: null,
+                kategori_pengeluaran_id: kategoriId,
+                program_event_id: programId,
                 isDuplicate,
                 isAutoWait,
+                // Labels for display in preview
+                _kem_nama: kementerian.find(k => k.id === kemId)?.nama || null,
+                _jenis_nama: jenisTransaksi.find(j => j.id === jenisId)?.nama
+                    || kategoriPengeluaran.find(k => k.id === kategoriId)?.nama || null,
+                _program_nama: programEvent.find(p => p.id === programId)?.nama || null,
             }
         })
 

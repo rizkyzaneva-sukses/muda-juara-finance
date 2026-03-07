@@ -219,15 +219,57 @@ export default function UploadPage() {
     setLoading(false)
   }
 
-  const downloadTemplate = () => {
-    const headers = ['tanggal', 'keterangan', 'debit', 'kredit', 'sumber']
+  const downloadTemplate = async () => {
+    // Ambil master data dari API untuk referensi
+    let masterInfo = ''
+    try {
+      const res = await fetch('/api/mutasi/csv-parse')
+      const master = await res.json()
+
+      const kemList = (master.kementerian || []).map((k: any) => `${k.nama}`).join(' | ')
+      const jenisList = (master.jenis_transaksi || []).map((j: any) => `${j.nama}`).join(' | ')
+      const kategoriList = (master.kategori_pengeluaran || []).map((k: any) => k.nama).join(' | ')
+      const programList = (master.program_event || []).map((p: any) => p.nama).join(' | ')
+
+      masterInfo = [
+        '',
+        '# ================================================================',
+        '# PANDUAN REFERENSI - Salin nama persis untuk kolom terkait',
+        '# ================================================================',
+        '',
+        '# KOLOM kementerian (untuk transaksi MASUK):',
+        `# ${kemList}`,
+        '',
+        '# KOLOM jenis_transaksi (untuk transaksi MASUK):',
+        `# ${jenisList}`,
+        '',
+        '# KOLOM kategori_pengeluaran (untuk transaksi KELUAR - isi di jenis_transaksi):',
+        `# ${kategoriList}`,
+        '',
+        '# KOLOM program_event (opsional - untuk semua tipe):',
+        `# ${programList}`,
+        '',
+        '# KOLOM sumber: BCA | BSI | manual',
+        '# KOLOM debit: isi nominal jika transaksi KELUAR, isi 0 jika MASUK',
+        '# KOLOM kredit: isi nominal jika transaksi MASUK, isi 0 jika KELUAR',
+        '# KOLOM tanggal: format YYYY-MM-DD contoh: 2026-03-07',
+      ].join('\n')
+    } catch (_) { }
+
+    const headers = ['tanggal', 'keterangan', 'debit', 'kredit', 'sumber', 'kementerian', 'jenis_transaksi', 'program_event']
     const examples = [
-      ['2026-03-01', 'Pembayaran iuran KEMENKES', '0', '500117', 'BCA'],
-      ['2026-03-02', 'Pembelian ATK Sekretariat', '150000', '0', 'BCA'],
-      ['2026-03-03', 'Iuran anggota KEMENSOS', '0', '1000297', 'BSI'],
-      ['2026-03-04', 'Operasional transportasi', '75000', '0', 'manual'],
+      ['2026-03-01', 'Pembayaran iuran pemasukan', '0', '500117', 'BCA', 'Kementerian SDM', 'Transfer BI-Fast', 'Baksos'],
+      ['2026-03-02', 'Pembelian ATK Sekretariat', '150000', '0', 'BCA', '', 'Transport', ''],
+      ['2026-03-03', 'Iuran anggota masuk', '0', '1000297', 'BSI', 'Keuangan', 'Transfer BI-Fast', 'UMROH MJ'],
+      ['2026-03-04', 'Beli perlengkapan acara', '75000', '0', 'manual', '', 'Bayar Venue / Tempat', 'Bukber 2026'],
     ]
-    const csv = [headers.join(','), ...examples.map(r => r.join(','))].join('\n')
+
+    const csv = [
+      headers.join(','),
+      ...examples.map(r => r.map(v => v.includes(',') ? `"${v}"` : v).join(',')),
+      masterInfo
+    ].join('\n')
+
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
