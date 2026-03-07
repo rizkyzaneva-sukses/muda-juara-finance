@@ -10,7 +10,8 @@ export default function TransaksiPage() {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
-    status: '', tipe: '', sumber: '', search: '', date_from: '', date_to: ''
+    status: '', tipe: '', sumber: '', search: '', date_from: '', date_to: '',
+    kementerian_id: '', jenis_transaksi_id: '', program_event_id: '', kategori_pengeluaran_id: ''
   })
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ keterangan: '', jumlah: 0 })
@@ -224,8 +225,27 @@ export default function TransaksiPage() {
             <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>s/d</span>
             <input type="date" value={filters.date_to} onChange={e => { setFilters(f => ({ ...f, date_to: e.target.value })); setPage(1) }} className="input-dark text-xs" />
           </div>
+          <select value={filters.kementerian_id} onChange={e => { setFilters(f => ({ ...f, kementerian_id: e.target.value })); setPage(1) }} className="input-dark text-xs" style={{ width: 140 }}>
+            <option value="">Semua Kementerian</option>
+            {kementerian.map((k: any) => <option key={k.id} value={k.id}>{k.kode} - {k.nama}</option>)}
+          </select>
+          {filters.tipe === 'keluar' ? (
+            <select value={filters.kategori_pengeluaran_id} onChange={e => { setFilters(f => ({ ...f, kategori_pengeluaran_id: e.target.value, jenis_transaksi_id: '' })); setPage(1) }} className="input-dark text-xs" style={{ width: 140 }}>
+              <option value="">Semua Jenis</option>
+              {kategoriPengeluaran.map((kp: any) => <option key={kp.id} value={kp.id}>{kp.nama}</option>)}
+            </select>
+          ) : (
+            <select value={filters.jenis_transaksi_id} onChange={e => { setFilters(f => ({ ...f, jenis_transaksi_id: e.target.value, kategori_pengeluaran_id: '' })); setPage(1) }} className="input-dark text-xs" style={{ width: 140 }}>
+              <option value="">Semua Jenis</option>
+              {jenisTransaksi.map((j: any) => <option key={j.id} value={j.id}>{j.nama}</option>)}
+            </select>
+          )}
+          <select value={filters.program_event_id} onChange={e => { setFilters(f => ({ ...f, program_event_id: e.target.value })); setPage(1) }} className="input-dark text-xs" style={{ width: 140 }}>
+            <option value="">Semua Program</option>
+            {programEvent.map((p: any) => <option key={p.id} value={p.id}>{p.nama}</option>)}
+          </select>
           {Object.values(filters).some(v => v) && (
-            <button onClick={() => { setFilters({ status: '', tipe: '', sumber: '', search: '', date_from: '', date_to: '' }); setPage(1) }}
+            <button onClick={() => { setFilters({ status: '', tipe: '', sumber: '', search: '', date_from: '', date_to: '', kementerian_id: '', jenis_transaksi_id: '', program_event_id: '', kategori_pengeluaran_id: '' }); setPage(1) }}
               className="text-xs px-3 py-1.5 rounded" style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)' }}>
               Reset
             </button>
