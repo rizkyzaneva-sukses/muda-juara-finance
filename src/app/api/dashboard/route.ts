@@ -14,8 +14,8 @@ export async function GET(req: NextRequest) {
       .from('rekening')
       .select('*')
 
-    const rekeningBCA = rekening?.find(r => r.bank === 'BCA Syariah')
-    const rekeningBSI = rekening?.find(r => r.bank === 'BSI')
+    const rekeningBCA = rekening?.find(r => r.bank?.toUpperCase() === 'BCA SYARIAH')
+    const rekeningBSI = rekening?.find(r => r.bank?.toUpperCase() === 'BSI')
 
     // Get all transaksi
     const { data: transaksi, error } = await supabaseAdmin
@@ -30,7 +30,9 @@ export async function GET(req: NextRequest) {
     let totalKeluarBCA = 0
     let totalMasukBSI = rekeningBSI?.saldo_awal || 0
     let totalKeluarBSI = 0
-    let totalMasuk = 0
+
+    // Total Masuk secara global harus menyertakan Saldo Awal dari kedua Bank
+    let totalMasuk = totalMasukBCA + totalMasukBSI
     let totalKeluar = 0
 
     transaksi?.forEach(t => {
@@ -132,15 +134,18 @@ export async function GET(req: NextRequest) {
       const progId = t.program_event_id || 'belum'
 
       // Find matching masuk entry or create pengeluaran entry
-      let found = false
+      let matchingKeys: string[] = []
       rincianMap.forEach((entry, key) => {
         if (entry.kementerian_id === t.kementerian_id && entry.program_id === t.program_event_id) {
-          entry.pengeluaran += t.jumlah
-          found = true
+          matchingKeys.push(key)
         }
       })
 
-      if (!found) {
+      if (matchingKeys.length > 0) {
+        // Just add to the first matching entry (usually the primary event row) to avoid double counting
+        const key = matchingKeys[0]
+        rincianMap.get(key).pengeluaran += t.jumlah
+      } else {
         const key = `keluar-${kemId}-${progId}`
         if (!rincianMap.has(key)) {
           rincianMap.set(key, {
@@ -158,6 +163,22 @@ export async function GET(req: NextRequest) {
         rincianMap.get(key).pengeluaran += t.jumlah
       }
     })
+
+    // Inject Saldo Awal row to balance the total
+    const totalSaldoAwal = totalMasukBCA + totalMasukBSI
+    if (totalSaldoAwal > 0) {
+      rincianMap.set('saldo_awal', {
+        kementerian_id: null,
+        kementerian_kode: null,
+        kementerian_nama: 'Tanpa Kementerian',
+        jenis_id: null,
+        jenis_kode: null,
+        jenis_nama: 'Saldo Awal Rekening',
+        program_id: null,
+        program_nama: 'Kas Sistem',
+        txn: 0, qris: 0, transfer: totalSaldoAwal, pengeluaran: 0, sisa: 0, persen: 0
+      })
+    }
 
     // Calculate sisa and persen
     const rincian = Array.from(rincianMap.values())
