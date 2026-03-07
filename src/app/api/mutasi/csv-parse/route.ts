@@ -84,8 +84,41 @@ export async function POST(req: NextRequest) {
             existing?.map(t => `${t.tanggal}-${normalizeStr(t.keterangan)}-${t.jumlah}`) || []
         )
 
+        // ── Helper: konversi berbagai format tanggal ke YYYY-MM-DD ──────────────
+        const parseDate = (raw: any): string => {
+            if (!raw && raw !== 0) return ''
+            const s = raw.toString().trim()
+
+            // Excel serial number (misal: 46059)
+            if (/^\d{4,6}$/.test(s) && Number(s) > 30000 && Number(s) < 60000) {
+                // Excel epoch: Jan 1 1900 = day 1, plus Excel's infamous Feb 29 1900 bug (+1)
+                const jsDate = new Date(Math.round((Number(s) - 25569) * 86400 * 1000))
+                const y = jsDate.getUTCFullYear()
+                const m = String(jsDate.getUTCMonth() + 1).padStart(2, '0')
+                const d = String(jsDate.getUTCDate()).padStart(2, '0')
+                return `${y}-${m}-${d}`
+            }
+
+            // Format DD/MM/YYYY atau D/M/YYYY
+            if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(s)) {
+                const [dd, mm, yyyy] = s.split('/')
+                return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`
+            }
+
+            // Format DD-MM-YYYY
+            if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(s)) {
+                const [dd, mm, yyyy] = s.split('-')
+                return `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`
+            }
+
+            // Sudah format YYYY-MM-DD atau ISO
+            if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10)
+
+            return s
+        }
+
         const preview = rows.map((row: any, idx: number) => {
-            const tanggal = (row.tanggal || '').toString().trim()
+            const tanggal = parseDate(row.tanggal || row.TANGGAL || '')
             const keterangan = (row.keterangan || row.deskripsi || '').toString().trim()
             const debitRaw = row.debit || row.debet || 0
             const kreditRaw = row.kredit || 0
