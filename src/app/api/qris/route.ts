@@ -19,9 +19,17 @@ export async function POST(req: NextRequest) {
       const pId = r.program_event_id || null
       let status = r.status || 'pending'
 
-      const filledCount = [kId, jId, pId].filter(x => x).length
-      if (status !== 'matched' && filledCount >= 2) {
-        status = 'verified'
+      // DB check constraint hanya allow: 'pending', 'matched', 'cek_manual'
+      // 'valid' diset saat parse (Auto Skip MYBB), kita simpan sebagai 'matched' agar langsung skip rekonsiliasi
+      if (status === 'valid') {
+        status = 'matched'
+      } else if (status === 'verified') {
+        status = 'pending'
+      }
+
+      // Pastikan hanya value yang valid
+      if (!['pending', 'matched', 'cek_manual'].includes(status)) {
+        status = 'pending'
       }
 
       return {
