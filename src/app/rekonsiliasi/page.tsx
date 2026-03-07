@@ -214,10 +214,11 @@ export default function RekonsiliasiPage() {
     const res = await fetch(`/api/qris?${params.toString()}`)
     const d = await res.json()
     const rows = d.data || []
-    const headers = ['No', 'Tanggal', 'Merchant', 'Jumlah', 'Jumlah_Netto_MDR', 'Kementerian', 'Jenis', 'Program/Event', 'Status']
+    const headers = ['No', 'Transaction_ID', 'Tanggal', 'Merchant', 'Jumlah', 'Jumlah_Netto_MDR', 'Kementerian', 'Jenis', 'Program/Event', 'Status']
     const MDR = 0.007
     const lines = rows.map((q: any, i: number) => [
       i + 1,
+      q.tid || '',
       q.created_date?.substring(0, 10) || '',
       `"${(q.merchant_name || '').replace(/"/g, '""')}"`,
       q.amount,

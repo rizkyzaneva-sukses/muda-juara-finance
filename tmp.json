@@ -1,0 +1,18 @@
+[
+  {
+    "id": 2,
+    "nama": "YAYASAN MUDA KARYA MULIA",
+    "bank": "BSI",
+    "nomor_rekening": "7188888172",
+    "saldo_awal": 250168530,
+    "created_at": "2026-03-06T04:03:07.343897"
+  },
+  {
+    "id": 1,
+    "nama": "MUHAMMAD FIRDAUS SUGIARSA",
+    "bank": "BCA SYARIAH",
+    "nomor_rekening": "0590040242",
+    "saldo_awal": 48663941,
+    "created_at": "2026-03-06T04:03:07.343897"
+  }
+]

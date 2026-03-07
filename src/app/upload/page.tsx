@@ -2,10 +2,10 @@
 import { useState, useRef } from 'react'
 import AppLayout from '@/components/layout/AppLayout'
 import { formatRupiah, parseQrisCode, MDR_RATE } from '@/lib/qris'
-import { Upload, FileText, Image, Table, Trash2, Check, AlertCircle, Loader, Camera } from 'lucide-react'
+import { Upload, FileText, Image, Table, Trash2, Check, AlertCircle, Loader, Camera, Download, FileSpreadsheet } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
-type UploadMode = 'qris' | 'mutasi-pdf' | 'mutasi-image'
+type UploadMode = 'qris' | 'mutasi-pdf' | 'mutasi-image' | 'mutasi-csv'
 
 const BANK_OPTIONS = ['BCA', 'BSI'] as const
 type BankType = typeof BANK_OPTIONS[number]
@@ -165,11 +165,84 @@ export default function UploadPage() {
     setLoading(false)
   }
 
+  // ─── Mutasi CSV ────────────────────────────────────────────────────────────
+  const handleMutasiCSV = async (file: File) => {
+    await loadMasterData()
+    setLoading(true)
+    try {
+      const text = await file.text()
+      // Parse CSV manually to handle quoted fields
+      const parseCSVLine = (line: string): string[] => {
+        const result: string[] = []
+        let current = ''
+        let inQuotes = false
+        for (let i = 0; i < line.length; i++) {
+          const ch = line[i]
+          if (ch === '"') {
+            if (inQuotes && line[i + 1] === '"') { current += '"'; i++ }
+            else inQuotes = !inQuotes
+          } else if (ch === ',' && !inQuotes) {
+            result.push(current.trim()); current = ''
+          } else {
+            current += ch
+          }
+        }
+        result.push(current.trim())
+        return result
+      }
+
+      // Remove BOM if present
+      const cleanText = text.replace(/^\uFEFF/, '')
+      const allLines = cleanText.split(/\r?\n/).filter(l => l.trim())
+      if (allLines.length < 2) throw new Error('File CSV kosong atau tidak valid')
+
+      const headers = parseCSVLine(allLines[0]).map(h => h.toLowerCase().trim())
+      const rows = allLines.slice(1).map(line => {
+        const vals = parseCSVLine(line)
+        const obj: any = {}
+        headers.forEach((h, i) => { obj[h] = vals[i] || '' })
+        return obj
+      }).filter(r => r.tanggal || r.keterangan)
+
+      const token = localStorage.getItem('admin_token')
+      const res = await fetch('/api/mutasi/csv-parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ rows, bank }),
+      })
+      const data = await res.json()
+      if (data.error) throw new Error(data.error)
+      setPreview(data.preview || [])
+    } catch (e: any) {
+      showToast('Gagal parsing CSV: ' + e.message, 'error')
+    }
+    setLoading(false)
+  }
+
+  const downloadTemplate = () => {
+    const headers = ['tanggal', 'keterangan', 'debit', 'kredit', 'sumber']
+    const examples = [
+      ['2026-03-01', 'Pembayaran iuran KEMENKES', '0', '500117', 'BCA'],
+      ['2026-03-02', 'Pembelian ATK Sekretariat', '150000', '0', 'BCA'],
+      ['2026-03-03', 'Iuran anggota KEMENSOS', '0', '1000297', 'BSI'],
+      ['2026-03-04', 'Operasional transportasi', '75000', '0', 'manual'],
+    ]
+    const csv = [headers.join(','), ...examples.map(r => r.join(','))].join('\n')
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'template_mutasi_transaksi.csv'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   const handleFileDrop = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setPreview([])
     if (mode === 'qris') handleQrisFile(file)
+    else if (mode === 'mutasi-csv') handleMutasiCSV(file)
     else handleMutasiFile(file)
   }
 
@@ -180,6 +253,7 @@ export default function UploadPage() {
     if (!file) return
     setPreview([])
     if (mode === 'qris') handleQrisFile(file)
+    else if (mode === 'mutasi-csv') handleMutasiCSV(file)
     else handleMutasiFile(file)
   }
 
@@ -261,12 +335,14 @@ export default function UploadPage() {
   const totalNonDuplicate = preview.filter(r => !r.isDuplicate).length
   const totalDuplicate = preview.filter(r => r.isDuplicate).length
   const isMutasi = mode === 'mutasi-pdf' || mode === 'mutasi-image'
+  const isMutasiCSV = mode === 'mutasi-csv'
 
   // ─── Accept types ─────────────────────────────────────────────────────────
   const acceptMap: Record<UploadMode, string> = {
     'qris': '.xlsx,.xls',
     'mutasi-pdf': '.pdf',
     'mutasi-image': '.jpg,.jpeg,.png,.webp',
+    'mutasi-csv': '.csv',
   }
 
   // ─── Mode config ──────────────────────────────────────────────────────────
@@ -277,6 +353,13 @@ export default function UploadPage() {
       icon: Table,
       desc: 'File .xlsx dari DSP QRIS export',
       color: '#22c55e',
+    },
+    {
+      id: 'mutasi-csv',
+      label: 'Mutasi CSV (Manual)',
+      icon: FileSpreadsheet,
+      desc: 'Upload CSV mutasi/transaksi buatan sendiri',
+      color: '#f59e0b',
     },
     {
       id: 'mutasi-pdf',
@@ -299,15 +382,27 @@ export default function UploadPage() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ fontFamily: 'Syne, sans-serif' }}>Upload Data</h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
-            Upload QRIS, mutasi bank PDF, atau screenshot mutasi
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold" style={{ fontFamily: 'Syne, sans-serif' }}>Upload Data</h1>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>
+              Upload QRIS, mutasi bank PDF, screenshot, atau CSV manual
+            </p>
+          </div>
+          {isMutasiCSV && (
+            <button
+              onClick={downloadTemplate}
+              className="btn-secondary flex items-center gap-2 text-xs"
+              title="Download template CSV kosong"
+            >
+              <Download size={14} />
+              Download Template CSV
+            </button>
+          )}
         </div>
 
         {/* Mode tabs */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {modes.map(m => {
             const Icon = m.icon
             const active = mode === m.id
@@ -339,9 +434,9 @@ export default function UploadPage() {
         </div>
 
         {/* Bank selector for mutasi modes */}
-        {isMutasi && (
-          <div className="flex items-center gap-3">
-            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Bank:</span>
+        {(isMutasi || isMutasiCSV) && (
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Bank/Sumber:</span>
             {BANK_OPTIONS.map(b => (
               <button
                 key={b}
@@ -356,9 +451,27 @@ export default function UploadPage() {
                 {b === 'BCA' ? 'BCA Syariah' : 'BSI'}
               </button>
             ))}
+            {isMutasiCSV && (
+              <button
+                onClick={() => setBank('manual' as any)}
+                className="px-4 py-1.5 rounded-lg text-sm font-medium transition-all"
+                style={{
+                  background: (bank as any) === 'manual' ? 'rgba(245,158,11,0.1)' : 'var(--bg-card)',
+                  border: (bank as any) === 'manual' ? '1px solid rgba(245,158,11,0.3)' : '1px solid var(--bg-border)',
+                  color: (bank as any) === 'manual' ? '#f59e0b' : 'var(--text-secondary)',
+                }}
+              >
+                Manual
+              </button>
+            )}
             {mode === 'mutasi-image' && (
               <span className="text-xs ml-1 px-2 py-1 rounded" style={{ background: 'rgba(168,85,247,0.1)', color: '#a855f7' }}>
                 📸 AI Vision akan membaca screenshot
+              </span>
+            )}
+            {isMutasiCSV && (
+              <span className="text-xs px-2 py-1 rounded" style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }}>
+                💡 Download template dulu, isi data, lalu upload
               </span>
             )}
           </div>
@@ -384,6 +497,7 @@ export default function UploadPage() {
                   {mode === 'mutasi-pdf' && 'Memproses PDF dengan GPT-4o...'}
                   {mode === 'mutasi-image' && 'Membaca screenshot dengan AI Vision...'}
                   {mode === 'qris' && 'Memproses file QRIS...'}
+                  {mode === 'mutasi-csv' && 'Memproses file CSV...'}
                 </p>
                 <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
                   {isMutasi ? 'Proses AI biasanya 10–30 detik, harap tunggu' : ''}
@@ -400,11 +514,21 @@ export default function UploadPage() {
                   {mode === 'qris' && 'Format: .xlsx (DSP QRIS Export)'}
                   {mode === 'mutasi-pdf' && `Format: PDF mutasi ${bank} Syariah`}
                   {mode === 'mutasi-image' && `Format: JPG/PNG screenshot mutasi ${bank}`}
+                  {mode === 'mutasi-csv' && 'Format: .csv sesuai template (tanggal, keterangan, debit, kredit, sumber)'}
                 </p>
                 {isMutasi && (
                   <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
                     Diproses otomatis oleh AI — tidak perlu format khusus
                   </p>
+                )}
+                {isMutasiCSV && (
+                  <button
+                    onClick={e => { e.stopPropagation(); downloadTemplate() }}
+                    className="mt-3 flex items-center gap-1.5 mx-auto text-xs px-3 py-1.5 rounded-lg"
+                    style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}
+                  >
+                    <Download size={13} /> Download Template CSV
+                  </button>
                 )}
               </>
             )}
@@ -458,6 +582,7 @@ export default function UploadPage() {
                   {saving ? <div className="spinner" style={{ width: 16, height: 16 }} /> : <Check size={14} />}
                   Simpan {totalNonDuplicate} Data
                 </button>
+                {/* mutasi-csv juga menggunakan saveMutasi karena format preview-nya sama */}
               </div>
             </div>
 

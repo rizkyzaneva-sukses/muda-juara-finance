@@ -1,0 +1,5 @@
+tanggal,keterangan,debit,kredit,sumber
+2026-03-01,Pembayaran iuran KEMENKES,0,500117,BCA
+2026-03-02,Pembelian ATK Sekretariat,150000,0,BCA
+2026-03-03,Iuran anggota KEMENSOS,0,1000297,BSI
+2026-03-04,Operasional transportasi,75000,0,manual
