@@ -37,8 +37,11 @@ export async function GET(req: NextRequest) {
     if (tipe) query = query.eq('tipe', tipe)
     if (sumber) query = query.eq('sumber', sumber)
     if (kemId) query = query.eq('kementerian_id', kemId)
-    if (jenisId) query = query.eq('jenis_transaksi_id', jenisId)
-    if (kategoriId) query = query.eq('kategori_pengeluaran_id', kategoriId)
+    if (jenisId === 'tanpa') query = query.is('jenis_transaksi_id', null)
+    else if (jenisId) query = query.eq('jenis_transaksi_id', jenisId)
+
+    if (kategoriId === 'tanpa') query = query.is('kategori_pengeluaran_id', null)
+    else if (kategoriId) query = query.eq('kategori_pengeluaran_id', kategoriId)
     if (programId) query = query.eq('program_event_id', programId)
     if (search) query = query.ilike('keterangan', `%${search}%`)
     if (dateFrom) query = query.gte('tanggal', dateFrom)

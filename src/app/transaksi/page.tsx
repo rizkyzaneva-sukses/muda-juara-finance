@@ -280,11 +280,13 @@ export default function TransaksiPage() {
           {filters.tipe === 'keluar' ? (
             <select value={filters.kategori_pengeluaran_id} onChange={e => { setFilters(f => ({ ...f, kategori_pengeluaran_id: e.target.value, jenis_transaksi_id: '' })); setPage(1) }} className="input-dark text-xs" style={{ width: 140 }}>
               <option value="">Semua Jenis</option>
+              <option value="tanpa">Tanpa Jenis / Ktg</option>
               {kategoriPengeluaran.map((kp: any) => <option key={kp.id} value={kp.id}>{kp.nama}</option>)}
             </select>
           ) : (
             <select value={filters.jenis_transaksi_id} onChange={e => { setFilters(f => ({ ...f, jenis_transaksi_id: e.target.value, kategori_pengeluaran_id: '' })); setPage(1) }} className="input-dark text-xs" style={{ width: 140 }}>
               <option value="">Semua Jenis</option>
+              <option value="tanpa">Tanpa Jenis / Ktg</option>
               {jenisTransaksi.map((j: any) => <option key={j.id} value={j.id}>{j.nama}</option>)}
             </select>
           )}
@@ -367,6 +369,7 @@ export default function TransaksiPage() {
                   <th className="text-left px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Keterangan</th>
                   <th className="text-right px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Jumlah</th>
                   <th className="text-left px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Kementerian</th>
+                  <th className="text-left px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Jenis / KTG</th>
                   <th className="text-left px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Program</th>
                   <th className="text-left px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Sumber</th>
                   <th className="text-left px-5 py-3 text-xs uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>Status</th>
@@ -375,9 +378,9 @@ export default function TransaksiPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={9} className="text-center py-12"><div className="spinner mx-auto" /></td></tr>
+                  <tr><td colSpan={10} className="text-center py-12"><div className="spinner mx-auto" /></td></tr>
                 ) : data.length === 0 ? (
-                  <tr><td colSpan={9} className="text-center py-12 text-sm" style={{ color: 'var(--text-secondary)' }}>Tidak ada data</td></tr>
+                  <tr><td colSpan={10} className="text-center py-12 text-sm" style={{ color: 'var(--text-secondary)' }}>Tidak ada data</td></tr>
                 ) : data.map(t => (
                   <tr key={t.id} className="table-row-hover" style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                     <td className="px-5 py-3 text-center border-r" style={{ borderColor: 'var(--bg-border)' }}>
@@ -389,7 +392,7 @@ export default function TransaksiPage() {
                       />
                     </td>
                     {editingId === t.id ? (
-                      <td colSpan={8} className="px-5 py-3">
+                      <td colSpan={9} className="px-5 py-3">
                         <div className="flex items-center gap-3">
                           <input
                             className="input-dark text-xs flex-1"
@@ -439,7 +442,10 @@ export default function TransaksiPage() {
                           ) : '—'}
                         </td>
                         <td className="px-5 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                          {t.program_event?.nama || t.kategori_pengeluaran?.nama || '—'}
+                          {t.jenis_transaksi?.nama || t.kategori_pengeluaran?.nama || '—'}
+                        </td>
+                        <td className="px-5 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                          {t.program_event?.nama || '—'}
                         </td>
                         <td className="px-5 py-3">
                           <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--text-secondary)' }}>
